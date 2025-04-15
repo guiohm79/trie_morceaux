@@ -293,6 +293,43 @@ QLabel {
     color: #E0E0E0;
 }
 
+/* Onglets */
+QTabWidget::pane {
+    border: 1px solid #3E3E42;
+    background-color: #252526;
+    top: -1px;
+}
+
+QTabWidget::tab-bar {
+    alignment: left;
+}
+
+QTabBar::tab {
+    background-color: #3E3E42;
+    color: #E0E0E0;
+    border: 1px solid #555555;
+    border-bottom: none;
+    border-top-left-radius: 4px;
+    border-top-right-radius: 4px;
+    padding: 6px 12px;
+    margin-right: 2px;
+}
+
+QTabBar::tab:selected {
+    background-color: #007ACC;
+    color: #FFFFFF;
+    border: 1px solid #007ACC;
+    border-bottom: none;
+}
+
+QTabBar::tab:!selected {
+    margin-top: 2px;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #505050;
+}
+
 /* Séparateurs */
 QSplitter::handle {
     background-color: #3E3E42;

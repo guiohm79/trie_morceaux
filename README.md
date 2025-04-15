@@ -31,6 +31,7 @@ Il devient difficile de s'y retrouver lorsque plusieurs versions d'un même proj
 - Regroupement des fichiers par source dans la vue détaillée
 - Mise en évidence des fichiers les plus récents
 - Comparaison facile des différentes versions d'un même projet
+- **Système de notation** avec étoiles (0-5) pour évaluer vos projets
 
 ### 3. Aperçu audio intégré
 - Lecture des fichiers WAV directement dans l'application
@@ -48,10 +49,16 @@ Il devient difficile de s'y retrouver lorsque plusieurs versions d'un même proj
 - Option pour ne garder que le `.cpr` le plus récent et ignorer les `.bak`
 - Structure de dossiers Cubase lors de la sauvegarde (Audio, Auto Saves, etc.)
 
-### 6. Personnalisation de l'interface
-- **Mode sombre** pour réduire la fatigue visuelle
+### 6. Organisation et métadonnées
+- **Système de tags** pour catégoriser vos projets
+- **Notation à étoiles** (0-5) pour évaluer l'importance ou la qualité
+- Auto-complétion des tags basée sur les tags existants
+- Sauvegarde persistante des métadonnées
+
+### 7. Personnalisation de l'interface
+- **Mode sombre** optimisé pour réduire la fatigue visuelle
 - Sauvegarde des préférences utilisateur
-- Interface adaptative
+- Interface adaptative et intuitive
 
 ## 🛠️ Installation
 
@@ -103,7 +110,18 @@ python main.py
 8. **Sauvegarde** : 
    - Choisissez un dossier de destination en cliquant sur "Dossier de destination"
    - Cochez ou décochez l'option "Conserver les fichiers .bak" selon vos préférences
+   - Activez l'option "Supprimer les fichiers commençant par ._" pour nettoyer les fichiers temporaires
+   - Renommez le projet de destination si nécessaire
+   - Ajoutez des notes textuelles qui seront sauvegardées avec le projet
    - Cliquez sur "Sauvegarder le projet sélectionné" pour copier les fichiers
+
+9. **Organisation** :
+   - Attribuez des tags à vos projets pour une meilleure organisation
+   - Notez vos projets avec un système d'étoiles (0-5)
+   - Utilisez l'auto-complétion pour ajouter rapidement des tags existants
+
+10. **Intégration Cubase** :
+    - Ouvrez directement vos projets dans Cubase depuis l'application
 
 ## 📁 Structure du projet
 
@@ -120,6 +138,7 @@ python main.py
 ├── utils/                  # Utilitaires
 │   ├── __init__.py
 │   ├── scanner.py          # Scanner de projets Cubase
+│   ├── metadata_manager.py # Gestionnaire de métadonnées (tags et notes)
 │   ├── audio_player.py     # Interface pour la lecture audio
 │   ├── pygame_audio_player.py # Lecteur audio basé sur pygame
 │   └── system_audio_player.py # Lecteur audio utilisant le système
@@ -144,24 +163,28 @@ python main.py
 - ✅ Coloration des différentes sources et fichiers pour une meilleure visibilité
 - ✅ Aperçu audio des fichiers WAV
 - ✅ Structure de dossiers Cubase lors de la sauvegarde
-- ✅ Mode sombre pour réduire la fatigue visuelle
+- ✅ Mode sombre optimisé pour réduire la fatigue visuelle
+- ✅ Option pour supprimer les fichiers commençant par "._"
+- ✅ Option pour renommer le répertoire du projet de destination
+- ✅ Option pour ajouter une note au format txt intégrée au répertoire de sauvegarde
+- ✅ Possibilité de lancer le projet dans Cubase à partir de l'application
+- ✅ Système de tags et notation à étoiles pour les projets
 
-## 🔮 Évolutions prioritaires
+## 🔮 Évolutions futures
 
-- ajout d'une option pour supprimer les fichiers commençant par "._"
-- ajout d'une option pour renomer le repertoire du projet de destination
-- ajout d'une option pour ajouter une note au format txt integrer au repertoire de sauvegarde
-- ajout de la possibilité de lancer le projet dans cubase a partir de l'application
-- ajout d'un système de tags et notes pour les projets
+- Amélioration continue de l'interface utilisateur
+- Optimisation des performances pour les collections de projets très volumineuses
+- Support multiplateforme amélioré (macOS, Linux)
 
 
 ## 🔮 Évolutions possibles secondaires
-
 
 - Versioning avancé des projets
 - Analyse du contenu des fichiers CPR (si possible)
 - Intégration avec des services cloud pour la sauvegarde
 - Synchronisation automatique entre plusieurs sources
+- Statistiques d'utilisation et rapports sur vos projets
+- Exportation/importation des métadonnées (tags et notes) et sauvegardes dans un fichier json inclut dans le repertoire du projet
 
 
 ## 📄 Licence
