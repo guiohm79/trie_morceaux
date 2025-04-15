@@ -9,19 +9,21 @@ import os
 import sys
 from pathlib import Path
 import json
+import subprocess
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QTableView, QFileDialog,
     QGroupBox, QCheckBox, QMessageBox, QProgressBar,
     QSplitter, QTreeWidget, QTreeWidgetItem, QHeaderView,
     QComboBox, QApplication, QAction, QToolBar, QStatusBar,
-    QLineEdit, QMenu
+    QLineEdit, QMenu, QTextEdit, QTabWidget, QCompleter
 )
 from PyQt5.QtCore import Qt, QSize, pyqtSlot, QThread, pyqtSignal, QPoint
 from PyQt5.QtGui import QIcon, QFont, QColor, QBrush
 
 from utils.scanner import CubaseScanner
 from utils.pygame_audio_player import PygameAudioPlayer
+from utils.metadata_manager import MetadataManager
 from models.project_model import ProjectTableModel
 
 class ScanThread(QThread):
@@ -61,6 +63,7 @@ class MainWindow(QMainWindow):
         super().__init__()
         
         self.scanner = CubaseScanner()
+        self.metadata_manager = MetadataManager()
         self.selected_directories = []
         self.destination_directory = None
         self.all_projects_data = []
@@ -105,7 +108,10 @@ class MainWindow(QMainWindow):
         
         prefs = {
             'dark_mode': self.action_toggle_theme.isChecked(),
-            'remove_dotunderscore': self.chk_remove_dotunderscore.isChecked()
+            'remove_dotunderscore': self.chk_remove_dotunderscore.isChecked(),
+            'last_rename': self.txt_rename.text().strip(),
+            'last_notes': self.txt_notes.toPlainText(),
+            'cubase_path': getattr(self, 'cubase_path', '')
         }
         
         with open(prefs_file, 'w') as f:
@@ -128,6 +134,19 @@ class MainWindow(QMainWindow):
                 # Appliquer l'option de suppression des fichiers ._
                 if prefs.get('remove_dotunderscore', False):
                     self.chk_remove_dotunderscore.setChecked(True)
+                
+                # Restaurer le dernier nom de projet utilisé
+                last_rename = prefs.get('last_rename', '')
+                if last_rename:
+                    self.txt_rename.setText(last_rename)
+                
+                # Restaurer les dernières notes utilisées
+                last_notes = prefs.get('last_notes', '')
+                if last_notes:
+                    self.txt_notes.setText(last_notes)
+                
+                # Restaurer le chemin de Cubase
+                self.cubase_path = prefs.get('cubase_path', '')
             except Exception as e:
                 print(f"Erreur lors du chargement des préférences: {e}")
     
@@ -229,6 +248,13 @@ class MainWindow(QMainWindow):
         details_group = QGroupBox("Détails du projet")
         details_layout = QVBoxLayout(details_group)
         
+        # Onglets pour les différentes vues
+        self.details_tabs = QTabWidget()
+        
+        # Onglet des fichiers
+        files_tab = QWidget()
+        files_layout = QVBoxLayout(files_tab)
+        
         # Arbre des fichiers du projet
         self.file_tree = QTreeWidget()
         self.file_tree.setObjectName("file_tree")  # ID pour le ciblage CSS
@@ -243,8 +269,77 @@ class MainWindow(QMainWindow):
         self.audio_player = PygameAudioPlayer()
         self.audio_player.setVisible(False)  # Masqué par défaut
         
-        details_layout.addWidget(self.file_tree)
-        details_layout.addWidget(self.audio_player)
+        files_layout.addWidget(self.file_tree)
+        files_layout.addWidget(self.audio_player)
+        
+        # Onglet des métadonnées (tags et notes)
+        metadata_tab = QWidget()
+        metadata_layout = QVBoxLayout(metadata_tab)
+        
+        # Section des tags
+        tags_group = QGroupBox("Tags")
+        tags_layout = QVBoxLayout(tags_group)
+        
+        # Champ pour ajouter des tags
+        tags_input_layout = QHBoxLayout()
+        self.lbl_tags = QLabel("Ajouter un tag:")
+        self.txt_tag_input = QLineEdit()
+        self.txt_tag_input.setPlaceholderText("Entrez un tag et appuyez sur Entrée")
+        self.txt_tag_input.returnPressed.connect(self.add_tag)
+        
+        # Auto-complétion des tags
+        self.tag_completer = QCompleter([])
+        self.tag_completer.setCaseSensitivity(Qt.CaseInsensitive)
+        self.txt_tag_input.setCompleter(self.tag_completer)
+        
+        self.btn_add_tag = QPushButton("Ajouter")
+        self.btn_add_tag.clicked.connect(self.add_tag)
+        
+        tags_input_layout.addWidget(self.lbl_tags)
+        tags_input_layout.addWidget(self.txt_tag_input, 1)
+        tags_input_layout.addWidget(self.btn_add_tag)
+        
+        # Affichage des tags actuels
+        self.lbl_current_tags = QLabel("Tags actuels:")
+        self.tags_container = QWidget()
+        self.tags_container_layout = QHBoxLayout(self.tags_container)
+        self.tags_container_layout.setContentsMargins(0, 0, 0, 0)
+        self.tags_container_layout.setSpacing(5)
+        self.tags_container_layout.setAlignment(Qt.AlignLeft)
+        
+        tags_layout.addLayout(tags_input_layout)
+        tags_layout.addWidget(self.lbl_current_tags)
+        tags_layout.addWidget(self.tags_container)
+        
+        # Section de notation à étoiles
+        rating_group = QGroupBox("Note du projet")
+        rating_layout = QHBoxLayout(rating_group)
+        
+        self.lbl_rating = QLabel("Attribuer une note:")
+        rating_layout.addWidget(self.lbl_rating)
+        
+        # Création des boutons d'étoiles
+        self.rating_buttons = []
+        for i in range(6):  # 0 à 5 étoiles
+            btn = QPushButton(str(i) + " ★" if i > 0 else "0")
+            btn.setProperty("rating", i)
+            btn.clicked.connect(self.set_project_rating)
+            self.rating_buttons.append(btn)
+            rating_layout.addWidget(btn)
+        
+        # Bouton de sauvegarde des métadonnées
+        self.btn_save_metadata = QPushButton("Sauvegarder les métadonnées")
+        self.btn_save_metadata.clicked.connect(self.save_project_metadata)
+        
+        metadata_layout.addWidget(tags_group)
+        metadata_layout.addWidget(rating_group)
+        metadata_layout.addWidget(self.btn_save_metadata)
+        
+        # Ajout des onglets
+        self.details_tabs.addTab(files_tab, "Fichiers")
+        self.details_tabs.addTab(metadata_tab, "Tags & Notes")
+        
+        details_layout.addWidget(self.details_tabs)
         
         # Options de sauvegarde
         save_group = QGroupBox("Options de sauvegarde")
@@ -263,15 +358,44 @@ class MainWindow(QMainWindow):
         self.chk_remove_dotunderscore = QCheckBox("Supprimer les fichiers commençant par ._")
         self.chk_remove_dotunderscore.setToolTip("Supprime les fichiers temporaires/cachés commençant par ._ lors de la sauvegarde")
         
+        # Option pour renommer le répertoire du projet
+        rename_layout = QHBoxLayout()
+        self.lbl_rename = QLabel("Renommer le projet:")
+        self.txt_rename = QLineEdit()
+        self.txt_rename.setPlaceholderText("Laissez vide pour conserver le nom original")
+        rename_layout.addWidget(self.lbl_rename)
+        rename_layout.addWidget(self.txt_rename, 1)
+        
+        # Champ pour les notes du projet
+        notes_group = QGroupBox("Notes du projet")
+        notes_layout = QVBoxLayout(notes_group)
+        self.txt_notes = QTextEdit()
+        self.txt_notes.setPlaceholderText("Ajoutez ici des notes sur le projet (sera sauvegardé dans un fichier notes.txt)")
+        self.txt_notes.setMinimumHeight(80)  # Hauteur minimale pour le champ de notes
+        notes_layout.addWidget(self.txt_notes)
+        
+        # Boutons d'action
+        buttons_layout = QHBoxLayout()
+        
         # Bouton de sauvegarde
         self.btn_save = QPushButton("Sauvegarder le projet sélectionné")
         self.btn_save.clicked.connect(self.save_selected_project)
         self.btn_save.setEnabled(False)
         
+        # Bouton pour lancer le projet dans Cubase
+        self.btn_open_in_cubase = QPushButton("Ouvrir dans Cubase")
+        self.btn_open_in_cubase.clicked.connect(self.open_in_cubase)
+        self.btn_open_in_cubase.setEnabled(False)
+        
+        buttons_layout.addWidget(self.btn_save)
+        buttons_layout.addWidget(self.btn_open_in_cubase)
+        
         save_layout.addLayout(dest_layout)
+        save_layout.addLayout(rename_layout)
+        save_layout.addWidget(notes_group)
         save_layout.addWidget(self.chk_keep_bak)
         save_layout.addWidget(self.chk_remove_dotunderscore)
-        save_layout.addWidget(self.btn_save)
+        save_layout.addLayout(buttons_layout)
         
         # Ajout des widgets au groupe des résultats
         results_layout.addWidget(self.project_table, 1)
@@ -572,6 +696,167 @@ class MainWindow(QMainWindow):
         self.preview_audio_file(wav_file['path'])
     
     @pyqtSlot()
+    def add_tag(self):
+        """Ajout d'un tag au projet sélectionné"""
+        # Vérification qu'un projet est sélectionné
+        project_name = self.get_selected_project_name()
+        if not project_name:
+            return
+        
+        # Récupération du tag saisi
+        tag = self.txt_tag_input.text().strip()
+        if not tag:
+            return
+        
+        # Récupération des métadonnées du projet
+        metadata = self.metadata_manager.get_project_metadata(project_name)
+        
+        # Ajout du tag s'il n'existe pas déjà
+        if tag not in metadata['tags']:
+            metadata['tags'].append(tag)
+            self.metadata_manager.set_project_tags(project_name, metadata['tags'])
+            
+            # Mise à jour de l'affichage des tags
+            self.display_project_tags(project_name)
+            
+            # Mise à jour de l'auto-complétion
+            self.update_tag_completer()
+        
+        # Effacement du champ de saisie
+        self.txt_tag_input.clear()
+    
+    def remove_tag(self, tag):
+        """Suppression d'un tag du projet sélectionné
+        
+        Args:
+            tag (str): Tag à supprimer
+        """
+        # Vérification qu'un projet est sélectionné
+        project_name = self.get_selected_project_name()
+        if not project_name:
+            return
+        
+        # Récupération des métadonnées du projet
+        metadata = self.metadata_manager.get_project_metadata(project_name)
+        
+        # Suppression du tag s'il existe
+        if tag in metadata['tags']:
+            metadata['tags'].remove(tag)
+            self.metadata_manager.set_project_tags(project_name, metadata['tags'])
+            
+            # Mise à jour de l'affichage des tags
+            self.display_project_tags(project_name)
+    
+    def display_project_tags(self, project_name):
+        """Affichage des tags d'un projet
+        
+        Args:
+            project_name (str): Nom du projet
+        """
+        # Effacement des tags existants
+        while self.tags_container_layout.count():
+            item = self.tags_container_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+        
+        # Récupération des métadonnées du projet
+        metadata = self.metadata_manager.get_project_metadata(project_name)
+        
+        # Affichage des tags
+        for tag in metadata['tags']:
+            # Création d'un bouton pour chaque tag
+            tag_btn = QPushButton(tag)
+            tag_btn.setStyleSheet(
+                "QPushButton { background-color: #3498db; color: white; border-radius: 10px; padding: 5px; }"
+                "QPushButton:hover { background-color: #2980b9; }"
+            )
+            
+            # Création d'un menu contextuel pour le tag
+            tag_menu = QMenu(self)
+            remove_action = tag_menu.addAction("Supprimer")
+            remove_action.triggered.connect(lambda checked, t=tag: self.remove_tag(t))
+            tag_btn.setContextMenuPolicy(Qt.CustomContextMenu)
+            tag_btn.customContextMenuRequested.connect(
+                lambda pos, btn=tag_btn, menu=tag_menu: menu.exec_(btn.mapToGlobal(pos))
+            )
+            
+            self.tags_container_layout.addWidget(tag_btn)
+        
+        # Ajout d'un spacer pour aligner les tags à gauche
+        self.tags_container_layout.addStretch()
+    
+    def update_tag_completer(self):
+        """Mise à jour de l'auto-complétion des tags"""
+        all_tags = self.metadata_manager.get_all_tags()
+        from PyQt5.QtCore import QStringListModel
+        self.tag_completer.setModel(QStringListModel(all_tags))
+    
+    def set_project_rating(self):
+        """Attribution d'une note en étoiles au projet"""
+        # Vérification qu'un projet est sélectionné
+        project_name = self.get_selected_project_name()
+        if not project_name:
+            return
+        
+        # Récupération de la note depuis le bouton cliqué
+        sender = self.sender()
+        rating = sender.property("rating")
+        
+        # Mise à jour visuelle des boutons
+        self.update_rating_buttons(rating)
+        
+        # Sauvegarde de la note
+        self.metadata_manager.set_project_rating(project_name, rating)
+        
+        # Mise à jour du modèle de données
+        self.update_project_in_model(project_name, rating)
+    
+    def update_rating_buttons(self, selected_rating):
+        """Mise à jour visuelle des boutons d'étoiles
+        
+        Args:
+            selected_rating (int): Note sélectionnée (0-5)
+        """
+        for btn in self.rating_buttons:
+            rating = btn.property("rating")
+            if rating <= selected_rating:
+                btn.setStyleSheet("QPushButton { background-color: #f1c40f; color: white; }")
+            else:
+                btn.setStyleSheet("")
+    
+    def update_project_in_model(self, project_name, rating):
+        """Mise à jour de la note d'un projet dans le modèle de données
+        
+        Args:
+            project_name (str): Nom du projet
+            rating (int): Nouvelle note
+        """
+        # Recherche du projet dans les données du modèle
+        for i, project in enumerate(self.project_model._data):
+            if project['project_name'] == project_name:
+                # Mise à jour de la note
+                project['rating'] = rating
+                # Notification du modèle du changement
+                index = self.project_model.index(i, self.project_model._columns.index('rating'))
+                self.project_model.dataChanged.emit(index, index)
+                break
+    
+    def save_project_metadata(self):
+        """Sauvegarde des métadonnées du projet"""
+        # Vérification qu'un projet est sélectionné
+        project_name = self.get_selected_project_name()
+        if not project_name:
+            QMessageBox.warning(
+                self, "Aucun projet", 
+                "Veuillez sélectionner un projet pour sauvegarder les métadonnées."
+            )
+            return
+        
+        QMessageBox.information(
+            self, "Métadonnées sauvegardées", 
+            f"Les métadonnées du projet '{project_name}' ont été sauvegardées."
+        )
+    
     def show_project_details(self):
         """Affichage des détails du projet sélectionné"""
         # Récupération de l'index sélectionné
@@ -591,6 +876,17 @@ class MainWindow(QMainWindow):
         
         # Mise à jour de l'arbre des fichiers
         self.file_tree.clear()
+        
+        # Mise à jour des métadonnées
+        self.display_project_tags(project_name)
+        
+        # Affichage de la note en étoiles du projet
+        metadata = self.metadata_manager.get_project_metadata(project_name)
+        rating = metadata.get('rating', 0)
+        self.update_rating_buttons(rating)
+        
+        # Mise à jour de l'auto-complétion des tags
+        self.update_tag_completer()
         
         # Ajout des fichiers CPR groupés par source
         cpr_parent = QTreeWidgetItem(["Fichiers CPR"])
@@ -795,6 +1091,10 @@ class MainWindow(QMainWindow):
         
         # Activation du bouton de sauvegarde si un dossier de destination est sélectionné
         self.btn_save.setEnabled(self.destination_directory is not None)
+        
+        # Activation du bouton pour ouvrir dans Cubase
+        has_cpr = project and len(project['cpr_files']) > 0
+        self.btn_open_in_cubase.setEnabled(has_cpr)
     
     @pyqtSlot()
     def select_destination(self):
@@ -809,7 +1109,11 @@ class MainWindow(QMainWindow):
             
             # Activation du bouton de sauvegarde si un projet est sélectionné
             indexes = self.project_table.selectedIndexes()
-            self.btn_save.setEnabled(bool(indexes))
+            has_selection = bool(indexes)
+            self.btn_save.setEnabled(has_selection)
+            
+            # Désactivation du bouton pour ouvrir dans Cubase (sera activé lors de la sélection d'un projet)
+            self.btn_open_in_cubase.setEnabled(False)
     
     @pyqtSlot()
     def filter_projects(self):
@@ -883,6 +1187,81 @@ class MainWindow(QMainWindow):
         self.statusBar.showMessage(f"{len(sorted_data)} projets affichés ({mode_text})")
     
     @pyqtSlot()
+    def open_in_cubase(self):
+        """Ouvre le projet sélectionné dans Cubase"""
+        # Vérification qu'un projet est sélectionné
+        project_name = self.get_selected_project_name()
+        if not project_name:
+            QMessageBox.warning(
+                self, "Aucun projet", 
+                "Veuillez sélectionner un projet à ouvrir."
+            )
+            return
+        
+        # Récupération des détails du projet
+        project = self.scanner.get_project_details(project_name)
+        if not project or not project['cpr_files']:
+            QMessageBox.warning(
+                self, "Pas de fichier CPR", 
+                f"Le projet '{project_name}' ne contient pas de fichier CPR."
+            )
+            return
+        
+        # Récupération du fichier CPR le plus récent
+        latest_cpr = max(project['cpr_files'], key=lambda x: x['modified'])
+        cpr_path = latest_cpr['path']
+        
+        # Vérification du chemin de Cubase
+        if not hasattr(self, 'cubase_path') or not self.cubase_path:
+            self.select_cubase_path()
+            if not hasattr(self, 'cubase_path') or not self.cubase_path:
+                return
+        
+        try:
+            # Lancement de Cubase avec le fichier CPR
+            subprocess.Popen([self.cubase_path, cpr_path])
+            self.statusBar.showMessage(f"Ouverture du projet '{project_name}' dans Cubase...")
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Erreur", 
+                f"Impossible d'ouvrir Cubase: {e}"
+            )
+    
+    def select_cubase_path(self):
+        """Sélection du chemin de l'exécutable Cubase"""
+        # Suggestions de chemins courants pour Cubase
+        default_paths = [
+            "C:\\Program Files\\Steinberg\\Cubase 12\\Cubase12.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 11\\Cubase11.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 10\\Cubase10.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 9.5\\Cubase9.5.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 9\\Cubase9.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 8.5\\Cubase8.5.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 8\\Cubase8.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 7.5\\Cubase7.5.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 7\\Cubase7.exe",
+            "C:\\Program Files\\Steinberg\\Cubase 6\\Cubase6.exe"
+        ]
+        
+        # Vérification des chemins par défaut
+        for path in default_paths:
+            if os.path.exists(path):
+                self.cubase_path = path
+                self.save_preferences()  # Sauvegarde immédiate du chemin
+                return
+        
+        # Si aucun chemin par défaut n'est valide, demander à l'utilisateur
+        cubase_path, _ = QFileDialog.getOpenFileName(
+            self, "Sélectionner l'exécutable Cubase", 
+            "C:\\Program Files\\Steinberg",
+            "Exécutables (*.exe)"
+        )
+        
+        if cubase_path:
+            self.cubase_path = cubase_path
+            self.save_preferences()  # Sauvegarde immédiate du chemin
+    
+    @pyqtSlot()
     def save_selected_project(self):
         """Sauvegarde du projet sélectionné"""
         # Vérification qu'un projet est sélectionné
@@ -912,8 +1291,15 @@ class MainWindow(QMainWindow):
         # Sauvegarde du projet
         keep_bak = self.chk_keep_bak.isChecked()
         remove_dotunderscore = self.chk_remove_dotunderscore.isChecked()
+        
+        # Récupération du nouveau nom du projet (si spécifié)
+        new_project_name = self.txt_rename.text().strip()
+        
+        # Récupération des notes du projet (si spécifiées)
+        project_notes = self.txt_notes.toPlainText().strip()
+        
         success = self.scanner.copy_project(
-            project_name, self.destination_directory, keep_bak, remove_dotunderscore
+            project_name, self.destination_directory, keep_bak, remove_dotunderscore, new_project_name, project_notes
         )
         
         if success:

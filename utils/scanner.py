@@ -180,7 +180,7 @@ class CubaseScanner:
         """
         return self.projects.get(project_name, None)
     
-    def copy_project(self, project_name, destination, keep_bak=False, remove_dotunderscore=False):
+    def copy_project(self, project_name, destination, keep_bak=False, remove_dotunderscore=False, new_project_name="", project_notes=""):
         """
         Copie d'un projet vers un dossier de destination selon la structure Cubase
         
@@ -188,6 +188,9 @@ class CubaseScanner:
             project_name (str): Nom du projet
             destination (str): Chemin du dossier de destination
             keep_bak (bool): Conserver les fichiers .bak
+            remove_dotunderscore (bool): Supprimer les fichiers commençant par ._
+            new_project_name (str): Nouveau nom pour le répertoire du projet (facultatif)
+            project_notes (str): Notes à ajouter au projet dans un fichier notes.txt (facultatif)
             
         Returns:
             bool: Succès de l'opération
@@ -196,9 +199,14 @@ class CubaseScanner:
         if not project:
             return False
         
+        # Détermination du nom du dossier de destination
+        target_name = new_project_name if new_project_name else project_name
+        
         # Création du dossier de destination principal
-        dest_dir = Path(destination) / project_name
+        dest_dir = Path(destination) / target_name
         dest_dir.mkdir(parents=True, exist_ok=True)
+        
+        print(f"Sauvegarde du projet '{project_name}' vers '{dest_dir}'")
         
         # Copie du fichier CPR le plus récent
         if project['cpr_files']:
@@ -265,5 +273,20 @@ class CubaseScanner:
         for folder in ['Edits', 'Images', 'Track Pictures']:
             folder_path = dest_dir / folder
             folder_path.mkdir(exist_ok=True)
+        
+        # Création du fichier notes.txt si des notes sont fournies
+        if project_notes:
+            notes_file = dest_dir / 'notes.txt'
+            try:
+                # Ajout de la date et heure actuelle en en-tête
+                from datetime import datetime
+                header = f"Notes pour le projet '{project_name}' - {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
+                header += "-" * 80 + "\n\n"
+                
+                with open(notes_file, 'w', encoding='utf-8') as f:
+                    f.write(header + project_notes)
+                print(f"Fichier de notes créé: {notes_file}")
+            except Exception as e:
+                print(f"Erreur lors de la création du fichier de notes: {e}")
         
         return True

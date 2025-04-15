@@ -2,60 +2,61 @@
 # -*- coding: utf-8 -*-
 
 """
-Modèle de données pour les projets Cubase
+Modèle de données pour l'affichage des projets
 """
 
-from PyQt5.QtCore import Qt, QAbstractTableModel, QVariant, QModelIndex
-from PyQt5.QtGui import QColor, QBrush
-from datetime import datetime
 from pathlib import Path
+from datetime import datetime
+from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant
+from PyQt5.QtGui import QColor, QBrush
 
 class ProjectTableModel(QAbstractTableModel):
-    """Modèle de table pour l'affichage des projets dans la vue"""
+    """Modèle de données pour l'affichage des projets dans un tableau"""
     
-    def __init__(self, data=None):
-        """
-        Initialisation du modèle
+    def __init__(self, parent=None):
+        """Initialisation du modèle"""
+        super().__init__(parent)
         
-        Args:
-            data (list): Liste de dictionnaires contenant les données des projets
-        """
-        super(ProjectTableModel, self).__init__()
-        self._data = [] if data is None else data
+        # Données
+        self._data = []
+        
+        # En-têtes et colonnes du tableau
         self._headers = [
             "Nom du projet", 
-            "Source",
-            "CPR récent", 
-            "Date modif.", 
+            "Dossier", 
+            "Date", 
             "Nb CPR", 
             "Nb BAK", 
             "Nb WAV", 
-            "Taille (MB)"
+            "Taille (MB)",
+            "Note"
         ]
         self._columns = [
             'project_name', 
-            'source',
-            'latest_cpr', 
+            'source', 
             'latest_cpr_date', 
             'cpr_count', 
             'bak_count', 
             'wav_count', 
-            'total_size_mb'
+            'total_size_mb',
+            'rating'
         ]
         
         # Couleurs pour différencier les sources
-        self._source_colors = {
-            # Couleurs pastel pour différencier les sources
-            0: QColor(230, 245, 255),  # Bleu clair
-            1: QColor(255, 230, 230),  # Rouge clair
-            2: QColor(230, 255, 230),  # Vert clair
-            3: QColor(255, 255, 230),  # Jaune clair
-            4: QColor(255, 230, 255),  # Magenta clair
-            5: QColor(230, 255, 255),  # Cyan clair
-        }
-        
-        # Dictionnaire pour stocker les couleurs associées à chaque source
         self._source_to_color = {}
+        self._color_index = 0
+        self._colors = [
+            QColor(200, 230, 200),  # Vert pâle
+            QColor(200, 200, 230),  # Bleu pâle
+            QColor(230, 200, 200),  # Rouge pâle
+            QColor(230, 230, 200),  # Jaune pâle
+            QColor(200, 230, 230),  # Cyan pâle
+            QColor(230, 200, 230),  # Magenta pâle
+            QColor(220, 220, 220),  # Gris pâle
+            QColor(230, 215, 200),  # Orange pâle
+            QColor(215, 200, 230),  # Violet pâle
+            QColor(200, 230, 215)   # Turquoise pâle
+        ]
         
         # Mode d'affichage (par projet ou par dossier)
         self._view_mode = "project"  # "project" ou "folder"
@@ -96,6 +97,11 @@ class ProjectTableModel(QAbstractTableModel):
             if isinstance(value, str) and '\\' in value:
                 return value.split('\\')[-1]
             
+            # Formatage des notes en étoiles
+            if self._columns[col] == "rating":
+                rating = int(value) if isinstance(value, (int, float)) else 0
+                return "★" * rating + "☆" * (5 - rating)
+            
             return str(value)
         
         # Coloration des lignes en fonction de la source
@@ -108,24 +114,16 @@ class ProjectTableModel(QAbstractTableModel):
             
             # Sinon, attribuer une couleur à la source si ce n'est pas déjà fait
             if source not in self._source_to_color and source:
-                color_index = len(self._source_to_color) % len(self._source_colors)
-                self._source_to_color[source] = self._source_colors[color_index]
+                self._source_to_color[source] = self._colors[self._color_index % len(self._colors)]
+                self._color_index += 1
             
             # Retourner la couleur associée à la source
             if source in self._source_to_color:
                 return QBrush(self._source_to_color[source])
         
-        # Mise en évidence des fichiers les plus récents
-        elif role == Qt.FontRole and col == 2:  # Colonne CPR récent
-            if self._data[row].get('is_latest', False):
-                from PyQt5.QtGui import QFont
-                font = QFont()
-                font.setBold(True)
-                return font
-        
         return QVariant()
     
-    def update_data(self, data, view_mode="project"):
+    def update_data(self, data, view_mode=None):
         """
         Mise à jour des données du modèle
         
@@ -133,15 +131,29 @@ class ProjectTableModel(QAbstractTableModel):
             data (list): Nouvelles données
             view_mode (str): Mode d'affichage ("project" ou "folder")
         """
+        # Mise à jour du mode de visualisation si spécifié
+        if view_mode is not None:
+            self._view_mode = view_mode
+        
+        # Début de la mise à jour
         self.beginResetModel()
+        
+        # Mise à jour des données
         self._data = data if data is not None else []
-        self._view_mode = view_mode
         
         # Réinitialiser les couleurs des sources
         self._source_to_color = {}
         
+        # Ajout des notes depuis le gestionnaire de métadonnées
+        from utils.metadata_manager import MetadataManager
+        metadata_manager = MetadataManager()
+        
+        for project in self._data:
+            project_name = project['project_name']
+            project['rating'] = metadata_manager.get_project_rating(project_name)
+        
         # Marquer les projets les plus récents dans chaque dossier
-        if view_mode == "folder" and self._data:
+        if self._view_mode == "folder" and self._data:
             # Grouper par dossier et trouver le plus récent dans chaque groupe
             folders = {}
             for project in self._data:
