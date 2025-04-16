@@ -22,7 +22,7 @@ from PyQt5.QtWidgets import (
 from PyQt5.QtCore import Qt, QSize, pyqtSlot, QThread, pyqtSignal, QPoint
 from PyQt5.QtGui import QIcon, QFont, QColor, QBrush
 
-from utils.scanner import CubaseScanner
+from utils.tri_scanner import TriScanner
 from utils.pygame_audio_player import PygameAudioPlayer
 from utils.metadata_manager import MetadataManager
 from models.project_model import ProjectTableModel
@@ -41,7 +41,7 @@ class ScanThread(QThread):
         """
         super().__init__()
         self.directories = directories
-        self.scanner = CubaseScanner()
+        self.scanner = TriScanner()
     
     def run(self):
         """Exécution du thread"""
@@ -362,7 +362,7 @@ class MainWindow(QMainWindow):
         # Charger les préférences AVANT toute logique d'UI ou d'utilisation du workspace
         self.workspace_dir = None
         self.last_workspace = None
-        self.scanner = CubaseScanner()
+        self.scanner = TriScanner()
         self.metadata_manager = MetadataManager()
         self.selected_directories = []
         self.destination_directory = None
@@ -1696,7 +1696,7 @@ class MainWindow(QMainWindow):
             has_selection = bool(indexes)
             self.btn_save.setEnabled(has_selection)
             
-            # Désactivation du bouton pour ouvrir dans Cubase (sera activé lors de la sélection d'un projet)
+            # Désactivation du bouton pour ouvrir dans TriScanner (sera activé lors de la sélection d'un projet)
             self.btn_open_in_cubase.setEnabled(False)
     
     @pyqtSlot()

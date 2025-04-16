@@ -67,9 +67,24 @@ Il devient difficile de s'y retrouver lorsque plusieurs versions d'un même proj
 - Sauvegarde des préférences utilisateur
 - Interface adaptative et intuitive
 
-## ✨ Fonctionnalités principales du mode unique
+## ✨ Fonctionnalités principales du mode unique (workspace)
 
-A completer
+Le mode "unique" (workspace) permet de gérer et organiser tous vos projets Cubase situés dans un seul dossier racine (workspace). Ce mode est idéal si vous centralisez tous vos projets dans un même répertoire.
+
+- **Scan automatique du workspace** : Dès que vous sélectionnez un dossier workspace, un scan complet est lancé automatiquement.
+- **Organisation par dossier** : Les résultats sont organisés par dossier et non par projet, pour une vue d'ensemble du contenu de votre workspace.
+- **Toutes les fonctionnalités avancées** : Détails, tags, étoiles, tri, aperçu audio, etc., sont disponibles comme en mode multi-sources.
+- **Affichage arborescent** : Visualisez l'arborescence complète du workspace et accédez rapidement à tous les fichiers associés à vos projets.
+- **Sauvegarde et gestion centralisée** : Idéal pour le ménage, la sauvegarde ou la migration de tout un environnement Cubase.
+
+**Technique :**
+- Le scan du mode workspace est géré par le module `workspace_scanner.py`.
+- Le scan du mode multi-sources (tri) est géré par le module `tri_scanner.py`.
+
+**Choix du mode :**
+- Vous pouvez basculer entre le mode multi-sources (TRI) et le mode unique (WORKSPACE) via l'interface.
+- Le mode TRI permet d'ajouter plusieurs dossiers sources et de comparer les projets entre différentes origines.
+- Le mode WORKSPACE se concentre sur un seul dossier racine pour une gestion centralisée.
 
 ## 🛠️ Installation
 

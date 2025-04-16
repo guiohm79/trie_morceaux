@@ -1,0 +1,22 @@
+# Fonctions à répartir par mode
+
+| Fonction                                      | TRI | WORKSPACE | LES DEUX | Description |
+|-----------------------------------------------|:---:|:---------:|:--------:|-------------|
+| scan_directories                             | [X] |   [ ]     |  [ ]     | Lance le scan des dossiers sélectionnés (mode tri multi-sources) |
+| scan_complete                                | [X] |   [ ]     |  [ ]     | Traite les résultats du scan (maj modèle, affichage, etc) |
+| scan_workspace_projects                       | [ ] |   [ ]     |  [X]     | Scan du dossier workspace pour détecter tous les projets Cubase et charger leurs métadonnées locales |
+| scan_workspace_folders                       | [ ] |   [ ]     |  [X]     | Scan le dossier workspace et organise les résultats par dossier plutôt que par projet |
+| show_project_details                         | [ ] |   [ ]     |  [X]     | Affiche les détails du projet sélectionné (fichiers, sources, métadonnées) |
+| save_selected_project                        | [X] |   [ ]     |  [ ]     | Sauvegarde le projet sélectionné dans un dossier cible (copie, renommage, prise en compte des notes) |
+| sort_projects                                | [ ] |   [ ]     |  [X]     | Trie les projets selon le critère sélectionné (nom, date, taille, etc) |
+| set_project_rating / update_project_in_model  | [ ] |   [ ]     |  [X]     | Attribue une note (étoiles) à un projet et met à jour le modèle |
+| preview_audio_file                           | [ ] |   [ ]     |  [X]     | Prévisualisation (lecture) d'un fichier audio WAV |
+| on_item_double_clicked                       | [ ] |   [ ]     |  [X]     | Gestion du double-clic sur un fichier (prévisualisation audio) |
+| show_file_context_menu                       | [ ] |   [ ]     |  [X]     | Affiche un menu contextuel sur un fichier (actions possibles) |
+| show_project_tree_context_menu               | [ ] |   [ ]     |  [X]     | Menu contextuel sur l'arborescence principale des projets |
+| show_project_tree2_context_menu              | [ ] |   [X]     |  [ ]     | Menu contextuel sur la deuxième arborescence (dossier de travail) |
+| rename_item                                  | [ ] |   [ ]     |  [X]     | Renomme un fichier ou dossier dans l'arborescence |
+| create_new_file                              | [ ] |   [ ]     |  [X]     | Crée un nouveau fichier dans un dossier sélectionné |
+| create_new_folder                            | [ ] |   [ ]     |  [X]     | Crée un nouveau dossier dans un dossier sélectionné |
+
+> Coche la colonne appropriée pour chaque fonction.
