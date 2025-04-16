@@ -6,6 +6,8 @@ Application pour **trier, comparer et sauvegarder** vos projets Cubase (`.cpr`, 
 
 Cette application vous permet de visualiser clairement les différentes versions de vos projets provenant de différentes sources et de choisir lesquelles conserver en fonction de critères objectifs comme la date de modification et la taille des fichiers.
 
+Une deuxieme fonction de cette application permet la gestion des projets, metadonnées, tags, notes (etoiles)...
+
 ## 🔍 Contexte
 
 Les projets Cubase sont souvent répartis dans plusieurs dossiers et contiennent différents types de fichiers :
@@ -16,9 +18,9 @@ Les projets Cubase sont souvent répartis dans plusieurs dossiers et contiennent
 
 Il devient difficile de s'y retrouver lorsque plusieurs versions d'un même projet existent à différents endroits.
 
-## ✨ Fonctionnalités principales
+## ✨ Fonctionnalités principales du mode tri
 
-### 1. Scan intelligent
+### 1. Scan intelligent du mode tri
 - Parcours récursif de plusieurs dossiers racines
 - Regroupement des fichiers par nom de projet
 - Identification des fichiers `.cpr`, `.bak`, et `.wav`
@@ -64,6 +66,10 @@ Il devient difficile de s'y retrouver lorsque plusieurs versions d'un même proj
 - **Mode sombre** optimisé pour réduire la fatigue visuelle
 - Sauvegarde des préférences utilisateur
 - Interface adaptative et intuitive
+
+## ✨ Fonctionnalités principales du mode unique
+
+A completer
 
 ## 🛠️ Installation
 
@@ -181,6 +187,13 @@ python main.py
 - ✅ Mode workspace amélioré avec organisation par dossier
 
 ## 🔮 Évolutions futures
+
+- Redefinition du mode unique:
+  - ce mode permet la gestion des projets Cubase:
+   - personnalisation des metadonnées
+   - ajout d'un mode de scan du repertoire de travail, 
+
+- division du code en plusieurs modules, un module pour le mode tri et un module pour le mode unique
 
 - (100%) Ajout d'une fenêtre à côté du détail du projet dans les deux modes pour afficher l'arborescence du dossier du projet et permettre la manipulation des éléments (ajout, déplacement, suppression)
 - redimensionnement des fenetres
