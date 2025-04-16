@@ -177,16 +177,25 @@ python main.py
 
 ## 🔮 Évolutions futures
 - ✅ ouvrir l'application directement en mode "unique"
-- versioning avancé des projets   
-- en mode unique,pouvoir supprimer des elements d'un projets et d'enregistrer les modifications directement dans le repertoire de travail
-- Amélioration continue de l'interface utilisateur
-- Exportation/importation des métadonnées (tags et notes) et sauvegardes dans un fichier json inclut dans le repertoire du projet
+- ✅ Garder en memoire le chemin de cubase.exe (demande d'emplacement demander au premier lancement)
+- en mode unique, pouvoir supprimer des éléments d'un projet et d'enregistrer les modifications directement dans le répertoire de travail
+- ajouter une fenetre a coté du detail du projet pour afficher l'arborescence du dossier cu projet et de permettre la manipulation des elément, ajout, deplacement, suppression, glisser/deposer
+- Amélioration continue de l'interface utilisateur (lecteur audio, interface utilisateur, etc.)
+- Exportation/importation des métadonnées (tags et notes) et sauvegardes dans un fichier json inclut dans le répertoire du projet
 - Optimisation des performances pour les collections de projets très volumineuses
 - Support multiplateforme amélioré (macOS, Linux)
 
+## 🔮 Problèmes
+- lancement dans cubase en mode unique ne fonctionne pas, message "Veuillez selectionner un projet à ouvrir" 
+- lors du passage du mode unique à tri, le workspace unique garde le repertoire de travail mais il n'y a pas la possibilité de choisir un autre dossier de travail,
+   il faudrait:
+      soit repartir sur un workspace vide au changement de mode
+      soit agrementer le bouton "effacer liste"pour vider le workspace du mode tri 
 
 ## 🔮 Évolutions possibles secondaires
-- garder en memoire le repertoire de travail du mode unique
+- ✅ garder en memoire le repertoire de travail du mode unique
+- afficher la liste des plugins et VSTi utilisé dans le projet
+- versioning avancé des projets 
 - Intégration avec des services cloud pour la sauvegarde
 - Synchronisation automatique entre plusieurs sources
 - Statistiques d'utilisation et rapports sur vos projets

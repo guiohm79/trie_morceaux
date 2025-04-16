@@ -90,6 +90,19 @@ class MainWindow(QMainWindow):
             self.cmb_app_mode.setCurrentIndex(1)
         # Sinon, l'utilisateur choisira le workspace via l'interface (plus de sélection forcée au démarrage)
 
+    def reset_workspace(self):
+        """Réinitialise le workspace et la sélection de dossiers, vide la table des projets et met à jour l'UI."""
+        self.workspace_dir = None
+        self.selected_directories = []
+        self.project_model.update_data([])
+        if hasattr(self, 'dir_list'):
+            self.dir_list.clear()
+        if hasattr(self, 'lbl_workspace_path'):
+            self.lbl_workspace_path.setText("Dossier de travail : (aucun)")
+        if hasattr(self, 'statusBar'):
+            self.statusBar.showMessage("Workspace vidé. Aucun projet affiché.")
+        self.save_preferences()
+
     
     def closeEvent(self, event):
         """Gestion de la fermeture de l'application"""
@@ -482,7 +495,13 @@ class MainWindow(QMainWindow):
         action_save = QAction("Sauvegarder", self)
         action_save.triggered.connect(self.save_selected_project)
         toolbar.addAction(action_save)
-        
+
+        # Action pour vider le workspace
+        self.action_reset_workspace = QAction("Vider le workspace", self)
+        self.action_reset_workspace.setToolTip("Réinitialiser le workspace et la sélection de dossiers")
+        self.action_reset_workspace.triggered.connect(self.reset_workspace)
+        toolbar.addAction(self.action_reset_workspace)
+
         toolbar.addSeparator()
 
         # Sélecteur de mode global (multi-sources / espace de travail)
@@ -503,11 +522,21 @@ class MainWindow(QMainWindow):
             self.app_mode = 'multi_sources'
             self.action_select_workspace.setVisible(False)
             self.dir_group.setVisible(True)
+            # Vider la liste des dossiers sélectionnés
+            self.selected_directories = []
+            if hasattr(self, 'dir_list'):
+                self.dir_list.clear()
+            # Réinitialiser la table de projets
+            if hasattr(self, 'project_model'):
+                self.project_model.update_data([])
+            # Mettre à jour la barre de statut
+            if hasattr(self, 'statusBar'):
+                self.statusBar.showMessage("Mode multi-sources : aucun projet affiché")
         else:
             self.app_mode = 'workspace'
             self.action_select_workspace.setVisible(True)
             self.dir_group.setVisible(False)
-            # Optionnel : lancer scan automatique du workspace si déjà choisi
+            # Lancer scan automatique du workspace si déjà choisi
             if self.workspace_dir:
                 self.scan_workspace_projects()
 
