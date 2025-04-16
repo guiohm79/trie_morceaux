@@ -172,19 +172,18 @@ python main.py
 
 ## 🔮 Évolutions futures
 
+- Permettre a l'utilsateur de mieux gerer ses projets a l'aide de cette application en selectionnant un projet, visualiser toutes les infos, styles de musique, BPM, notes (sur 5etoiles), tags, versioning avancé des projets   
 - Amélioration continue de l'interface utilisateur
+- Exportation/importation des métadonnées (tags et notes) et sauvegardes dans un fichier json inclut dans le repertoire du projet
 - Optimisation des performances pour les collections de projets très volumineuses
 - Support multiplateforme amélioré (macOS, Linux)
 
 
 ## 🔮 Évolutions possibles secondaires
 
-- Versioning avancé des projets
-- Analyse du contenu des fichiers CPR (si possible)
 - Intégration avec des services cloud pour la sauvegarde
 - Synchronisation automatique entre plusieurs sources
 - Statistiques d'utilisation et rapports sur vos projets
-- Exportation/importation des métadonnées (tags et notes) et sauvegardes dans un fichier json inclut dans le repertoire du projet
 
 
 ## 📄 Licence
