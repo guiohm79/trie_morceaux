@@ -176,7 +176,7 @@ python main.py
 - ✅ Système de tags et notation à étoiles pour les projets
 
 ## 🔮 Évolutions futures
-- ouvrir l'application directement en mode "unique"
+- ✅ ouvrir l'application directement en mode "unique"
 - versioning avancé des projets   
 - en mode unique,pouvoir supprimer des elements d'un projets et d'enregistrer les modifications directement dans le repertoire de travail
 - Amélioration continue de l'interface utilisateur

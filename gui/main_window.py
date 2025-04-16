@@ -61,20 +61,35 @@ class MainWindow(QMainWindow):
     def __init__(self):
         """Initialisation de la fenêtre principale"""
         super().__init__()
-        
+        # Charger les préférences AVANT toute logique d'UI ou d'utilisation du workspace
+        self.workspace_dir = None
+        self.last_workspace = None
         self.scanner = CubaseScanner()
         self.metadata_manager = MetadataManager()
         self.selected_directories = []
         self.destination_directory = None
         self.all_projects_data = []
-        
+
         self.setWindowTitle("Tri Morceaux Cubase")
         self.setMinimumSize(1000, 700)
-        
+
         # Mode d'application : 'multi_sources' (par défaut) ou 'workspace'
-        self.app_mode = 'multi_sources'  # ou 'workspace'
-        self.workspace_dir = None
+        self.app_mode = 'workspace'  # Démarrage direct en mode unique
         self.setup_ui()
+        # Charger les préférences APRÈS l'initialisation de l'UI
+        self.load_preferences()
+        # Appliquer le workspace restauré si présent
+        if hasattr(self, 'last_workspace') and self.last_workspace:
+            self.workspace_dir = self.last_workspace
+            self.selected_directories = [self.workspace_dir]
+            if hasattr(self, 'lbl_workspace_path'):
+                self.lbl_workspace_path.setText(f"Dossier de travail : {self.workspace_dir}")
+            if hasattr(self, 'statusBar'):
+                self.statusBar.showMessage(f"Workspace courant : {self.workspace_dir}")
+        if hasattr(self, 'cmb_app_mode'):
+            self.cmb_app_mode.setCurrentIndex(1)
+        # Sinon, l'utilisateur choisira le workspace via l'interface (plus de sélection forcée au démarrage)
+
     
     def closeEvent(self, event):
         """Gestion de la fermeture de l'application"""
@@ -119,7 +134,8 @@ class MainWindow(QMainWindow):
             'remove_dotunderscore': self.chk_remove_dotunderscore.isChecked(),
             'last_rename': self.txt_rename.text().strip(),
             'last_notes': self.txt_notes.toPlainText(),
-            'cubase_path': getattr(self, 'cubase_path', '')
+            'cubase_path': getattr(self, 'cubase_path', ''),
+            'last_workspace': self.workspace_dir if self.workspace_dir else ''
         }
         
         with open(prefs_file, 'w') as f:
@@ -155,6 +171,8 @@ class MainWindow(QMainWindow):
                 
                 # Restaurer le chemin de Cubase
                 self.cubase_path = prefs.get('cubase_path', '')
+                # Restaurer le dernier workspace utilisé
+                self.last_workspace = prefs.get('last_workspace', None)
             except Exception as e:
                 print(f"Erreur lors du chargement des préférences: {e}")
     
@@ -205,6 +223,14 @@ class MainWindow(QMainWindow):
         # Par défaut, le groupe est visible (mode multi-sources)
         dir_group.setVisible(True)
         self.dir_group = dir_group
+
+        # Label pour le chemin du workspace courant
+        self.lbl_workspace_path = QLabel()
+        if self.workspace_dir:
+            self.lbl_workspace_path.setText(f"Dossier de travail : {self.workspace_dir}")
+        else:
+            self.lbl_workspace_path.setText("Dossier de travail : (aucun)")
+        main_layout.addWidget(self.lbl_workspace_path)
 
         # Groupe pour les résultats
         results_group = QGroupBox("Résultats")
@@ -489,6 +515,11 @@ class MainWindow(QMainWindow):
         dir_path = QFileDialog.getExistingDirectory(self, "Choisir le dossier de travail (workspace)")
         if dir_path:
             self.workspace_dir = dir_path
+            # Mettre à jour le label du chemin
+            if hasattr(self, 'lbl_workspace_path'):
+                self.lbl_workspace_path.setText(f"Dossier de travail : {self.workspace_dir}")
+            # Sauvegarder immédiatement le workspace dans les préférences
+            self.save_preferences()
             # Utiliser la logique du mode tri : scan_directories sur ce dossier unique
             self.selected_directories = [dir_path]
             self.scan_directories()
