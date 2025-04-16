@@ -57,7 +57,80 @@ class ScanThread(QThread):
 
 class MainWindow(QMainWindow):
     """Fenêtre principale de l'application"""
-    
+
+    # ... toutes les méthodes précédentes ...
+
+    def show_project_tree_context_menu(self, pos):
+        index = self.project_tree_view.indexAt(pos)
+        if not index.isValid():
+            return
+        menu = QMenu()
+        set_workspace_action = menu.addAction("Définir comme dossier de travail")
+        show_in_second_view_action = menu.addAction("Afficher dans la deuxième arborescence")
+        action = menu.exec_(self.project_tree_view.viewport().mapToGlobal(pos))
+        path = self.fs_model.filePath(index)
+        if action == set_workspace_action:
+            self.set_workspace_from_tree(path)
+        elif action == show_in_second_view_action:
+            self.set_second_tree_root(path)
+
+    def show_project_tree2_context_menu(self, pos):
+        index = self.project_tree_view2.indexAt(pos)
+        if not index.isValid():
+            return
+        menu = QMenu()
+        set_workspace_action = menu.addAction("Définir comme dossier de travail")
+        action = menu.exec_(self.project_tree_view2.viewport().mapToGlobal(pos))
+        path = self.fs_model2.filePath(index)
+        if action == set_workspace_action:
+            self.set_workspace_from_tree(path)
+
+    def set_workspace_from_tree(self, path):
+        # Change le workspace et relance le scan
+        self.workspace_dir = path
+        self.selected_directories = [path]
+        self.lbl_workspace_path.setText(f"Dossier de travail : {path}")
+        self.save_preferences()
+        self.scan_directories()
+        self.set_second_tree_root(path)
+
+    def set_second_tree_root(self, path):
+        # Déclarer la fonction locale set_index avant toute déconnexion
+        def set_index(loaded_path):
+            # Vérifier que le dossier chargé correspond bien à celui voulu
+            if loaded_path == path:
+                self.project_tree_view2.setRootIndex(self.fs_model2.index(path))
+                try:
+                    self.fs_model2.directoryLoaded.disconnect(set_index)
+                except Exception:
+                    pass
+
+        # Déconnecter toute connexion précédente pour éviter les doublons
+        try:
+            self.fs_model2.directoryLoaded.disconnect(set_index)
+        except Exception:
+            pass
+
+        self.fs_model2.setRootPath(path)
+        # Si le dossier est déjà chargé, on peut setRootIndex tout de suite
+        if self.fs_model2.index(path).isValid():
+            self.project_tree_view2.setRootIndex(self.fs_model2.index(path))
+        else:
+            self.fs_model2.directoryLoaded.connect(set_index)
+
+    def on_project_selected(self, selected, deselected):
+        # Afficher le dossier du projet sélectionné dans la 2ème arborescence
+        indexes = self.project_table.selectedIndexes()
+        if not indexes:
+            return
+        row = indexes[0].row()
+        # Récupérer le projet dans le modèle de table
+        if 0 <= row < len(self.project_model._data):
+            project = self.project_model._data[row]
+            folder = project.get('source')
+            if folder:
+                self.set_second_tree_root(folder)
+
     def __init__(self):
         """Initialisation de la fenêtre principale"""
         super().__init__()
@@ -78,17 +151,7 @@ class MainWindow(QMainWindow):
         self.setup_ui()
         # Charger les préférences APRÈS l'initialisation de l'UI
         self.load_preferences()
-        # Appliquer le workspace restauré si présent
-        if hasattr(self, 'last_workspace') and self.last_workspace:
-            self.workspace_dir = self.last_workspace
-            self.selected_directories = [self.workspace_dir]
-            if hasattr(self, 'lbl_workspace_path'):
-                self.lbl_workspace_path.setText(f"Dossier de travail : {self.workspace_dir}")
-            if hasattr(self, 'statusBar'):
-                self.statusBar.showMessage(f"Workspace courant : {self.workspace_dir}")
-        if hasattr(self, 'cmb_app_mode'):
-            self.cmb_app_mode.setCurrentIndex(1)
-        # Sinon, l'utilisateur choisira le workspace via l'interface (plus de sélection forcée au démarrage)
+        # L'utilisateur choisira le workspace via l'interface (plus de sélection forcée au démarrage)
 
     def reset_workspace(self):
         """Réinitialise le workspace et la sélection de dossiers, vide la table des projets et met à jour l'UI."""
@@ -300,11 +363,11 @@ class MainWindow(QMainWindow):
         
         # Onglets pour les différentes vues
         self.details_tabs = QTabWidget()
-        
+
         # Onglet des fichiers
         files_tab = QWidget()
         files_layout = QVBoxLayout(files_tab)
-        
+
         # Arbre des fichiers du projet
         self.file_tree = QTreeWidget()
         self.file_tree.setObjectName("file_tree")  # ID pour le ciblage CSS
@@ -314,14 +377,68 @@ class MainWindow(QMainWindow):
         self.file_tree.customContextMenuRequested.connect(self.show_file_context_menu)
         # Double-clic sur un fichier WAV pour le prévisualiser
         self.file_tree.itemDoubleClicked.connect(self.on_item_double_clicked)
-        
+
         # Lecteur audio pour les fichiers WAV
         self.audio_player = PygameAudioPlayer()
         self.audio_player.setVisible(False)  # Masqué par défaut
-        
+
         files_layout.addWidget(self.file_tree)
         files_layout.addWidget(self.audio_player)
-        
+        files_tab.setLayout(files_layout)
+        self.details_tabs.addTab(files_tab, "Fichiers")
+
+        # --- Nouvelle arborescence réelle du dossier projet (QTreeView + QFileSystemModel) ---
+        from PyQt5.QtWidgets import QTreeView, QFileSystemModel, QSplitter, QMenu
+        self.fs_model = QFileSystemModel()
+        self.fs_model.setRootPath("")  # RootPath sera défini dynamiquement
+        self.project_tree_view = QTreeView()
+        self.project_tree_view.setModel(self.fs_model)
+        self.project_tree_view.setHeaderHidden(False)
+        self.project_tree_view.setMinimumWidth(250)
+        self.project_tree_view.setEditTriggers(QTreeView.NoEditTriggers)
+        self.project_tree_view.setDragDropMode(QTreeView.DragDrop)
+        self.project_tree_view.setSelectionMode(QTreeView.SingleSelection)
+        self.project_tree_view.setAnimated(True)
+        self.project_tree_view.setSortingEnabled(True)
+        self.project_tree_view.setObjectName("project_tree_view")
+        # --- MENU CONTEXTUEL sur la première arborescence ---
+        self.project_tree_view.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.project_tree_view.customContextMenuRequested.connect(self.show_project_tree_context_menu)
+
+        self.fs_model2 = QFileSystemModel()
+        self.fs_model2.setRootPath("")
+        self.project_tree_view2 = QTreeView()
+        self.project_tree_view2.setModel(self.fs_model2)
+        self.project_tree_view2.setHeaderHidden(False)
+        self.project_tree_view2.setMinimumWidth(250)
+        self.project_tree_view2.setEditTriggers(QTreeView.NoEditTriggers)
+        self.project_tree_view2.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.project_tree_view2.customContextMenuRequested.connect(self.show_project_tree2_context_menu)
+
+        self.project_tree_view2.setEditTriggers(QTreeView.NoEditTriggers)
+        self.project_tree_view2.setDragDropMode(QTreeView.DragDrop)
+        self.project_tree_view2.setSelectionMode(QTreeView.SingleSelection)
+        self.project_tree_view2.setAnimated(True)
+        self.project_tree_view2.setSortingEnabled(True)
+        self.project_tree_view2.setObjectName("project_tree_view2")
+        self.project_tree_view2.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.project_tree_view2.customContextMenuRequested.connect(self.show_project_tree2_context_menu)
+
+        # Ajout du splitter horizontal : à gauche project_tree_view, au centre project_tree_view2, à droite les tabs de détails
+        self.details_splitter = QSplitter(Qt.Horizontal)
+        self.details_splitter.addWidget(self.project_tree_view)
+        self.details_splitter.addWidget(self.project_tree_view2)
+        self.details_splitter.addWidget(self.details_tabs)
+        self.details_splitter.setStretchFactor(0, 1)
+        self.details_splitter.setStretchFactor(1, 1)
+        self.details_splitter.setStretchFactor(2, 3)
+        details_layout.addWidget(self.details_splitter)
+        details_group.setLayout(details_layout)
+        # --- Fin ajout splitter/arborescences ---
+
+        # Connexion de la sélection de projet à l'affichage dans la deuxième arborescence
+        self.project_table.selectionModel().selectionChanged.connect(self.on_project_selected)
+
         # Onglet des métadonnées (tags et notes)
         metadata_tab = QWidget()
         metadata_layout = QVBoxLayout(metadata_tab)

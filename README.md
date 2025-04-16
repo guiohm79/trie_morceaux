@@ -174,28 +174,27 @@ python main.py
 - ✅ Option pour ajouter une note au format txt intégrée au répertoire de sauvegarde
 - ✅ Possibilité de lancer le projet dans Cubase à partir de l'application
 - ✅ Système de tags et notation à étoiles pour les projets
-
-## 🔮 Évolutions futures
 - ✅ ouvrir l'application directement en mode "unique"
 - ✅ Garder en memoire le chemin de cubase.exe (demande d'emplacement demander au premier lancement)
-- en mode unique, pouvoir supprimer des éléments d'un projet et d'enregistrer les modifications directement dans le répertoire de travail
-- ajouter une fenetre a coté du detail du projet pour afficher l'arborescence du dossier cu projet et de permettre la manipulation des elément, ajout, deplacement, suppression, glisser/deposer
+
+## 🔮 Évolutions futures
+
+- 1/2 ajouter une fenetre a coté du detail du projet dans les deux modes pour afficher l'arborescence du dossier du projet et de permettre la manipulation des elément, ajout, deplacement, suppression, glisser/deposer
+- redimensionnement des fenetres
 - Amélioration continue de l'interface utilisateur (lecteur audio, interface utilisateur, etc.)
 - Exportation/importation des métadonnées (tags et notes) et sauvegardes dans un fichier json inclut dans le répertoire du projet
 - Optimisation des performances pour les collections de projets très volumineuses
 - Support multiplateforme amélioré (macOS, Linux)
 
 ## 🔮 Problèmes
-- lancement dans cubase en mode unique ne fonctionne pas, message "Veuillez selectionner un projet à ouvrir" 
-- lors du passage du mode unique à tri, le workspace unique garde le repertoire de travail mais il n'y a pas la possibilité de choisir un autre dossier de travail,
-   il faudrait:
-      soit repartir sur un workspace vide au changement de mode
-      soit agrementer le bouton "effacer liste"pour vider le workspace du mode tri 
+
+ la deuxieme fenetre d'arborescence n'affiche pas l'arborescence du projet sélectionné dans la fenetre resultats 
 
 ## 🔮 Évolutions possibles secondaires
-- ✅ garder en memoire le repertoire de travail du mode unique
+- ajouter une option (case a cocher) pour garder en memoire le repertoire de travail du mode unique lors des futures ouverture de l'application
 - afficher la liste des plugins et VSTi utilisé dans le projet
 - versioning avancé des projets 
+- en mode unique, pouvoir supprimer des éléments d'un projet et d'enregistrer les modifications directement dans le répertoire de travail
 - Intégration avec des services cloud pour la sauvegarde
 - Synchronisation automatique entre plusieurs sources
 - Statistiques d'utilisation et rapports sur vos projets
