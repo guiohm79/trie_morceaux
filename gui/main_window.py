@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 import json
 import subprocess
+import datetime
 from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QTableView, QFileDialog,
@@ -78,21 +79,150 @@ class MainWindow(QMainWindow):
         index = self.project_tree_view2.indexAt(pos)
         if not index.isValid():
             return
-        menu = QMenu()
-        set_workspace_action = menu.addAction("Définir comme dossier de travail")
-        action = menu.exec_(self.project_tree_view2.viewport().mapToGlobal(pos))
+        
+        # Récupérer le chemin du fichier/dossier sélectionné
         path = self.fs_model2.filePath(index)
+        is_dir = self.fs_model2.isDir(index)
+        
+        # Créer le menu contextuel
+        menu = QMenu()
+        
+        # Actions communes
+        set_workspace_action = menu.addAction("Définir comme dossier de travail")
+        menu.addSeparator()
+        
+        # Actions spécifiques aux dossiers
+        if is_dir:
+            create_folder_action = menu.addAction("Créer un nouveau dossier")
+            create_file_action = menu.addAction("Créer un nouveau fichier")
+            menu.addSeparator()
+        
+        # Actions pour tous les éléments
+        rename_action = menu.addAction("Renommer")
+        delete_action = menu.addAction("Supprimer")
+        
+        # Afficher le menu et récupérer l'action sélectionnée
+        action = menu.exec_(self.project_tree_view2.viewport().mapToGlobal(pos))
+        
+        # Traiter l'action sélectionnée
         if action == set_workspace_action:
             self.set_workspace_from_tree(path)
+        elif is_dir and action == create_folder_action:
+            self.create_new_folder(path)
+        elif is_dir and action == create_file_action:
+            self.create_new_file(path)
+        elif action == rename_action:
+            self.rename_item(index)
+        elif action == delete_action:
+            self.delete_item(path)
 
     def set_workspace_from_tree(self, path):
-        # Change le workspace et relance le scan
+        # Change le workspace et configure la vue en fonction du mode
         self.workspace_dir = path
-        self.selected_directories = [path]
         self.lbl_workspace_path.setText(f"Dossier de travail : {path}")
         self.save_preferences()
-        self.scan_directories()
-        self.set_second_tree_root(path)
+        
+        # En mode workspace, utiliser la configuration spécifique
+        if self.app_mode == 'workspace':
+            self.setup_workspace_view(path)
+        else:
+            # En mode multi-sources, utiliser le scan standard
+            self.selected_directories = [path]
+            self.scan_directories()
+            self.set_second_tree_root(path)
+        
+    def create_new_folder(self, parent_path):
+        """Crée un nouveau dossier dans le chemin parent spécifié"""
+        from PyQt5.QtWidgets import QInputDialog
+        import os
+        
+        # Demander le nom du nouveau dossier
+        folder_name, ok = QInputDialog.getText(self, "Nouveau dossier", "Nom du dossier:")
+        
+        if ok and folder_name:
+            # Créer le dossier
+            new_folder_path = os.path.join(parent_path, folder_name)
+            try:
+                os.makedirs(new_folder_path, exist_ok=True)
+                self.statusBar.showMessage(f"Dossier créé: {new_folder_path}")
+            except Exception as e:
+                self.statusBar.showMessage(f"Erreur lors de la création du dossier: {str(e)}")
+                QMessageBox.warning(self, "Erreur", f"Impossible de créer le dossier: {str(e)}")
+    
+    def create_new_file(self, parent_path):
+        """Crée un nouveau fichier dans le chemin parent spécifié"""
+        from PyQt5.QtWidgets import QInputDialog
+        import os
+        
+        # Demander le nom du nouveau fichier
+        file_name, ok = QInputDialog.getText(self, "Nouveau fichier", "Nom du fichier:")
+        
+        if ok and file_name:
+            # Créer le fichier
+            new_file_path = os.path.join(parent_path, file_name)
+            try:
+                with open(new_file_path, 'w') as f:
+                    f.write('')  # Fichier vide
+                self.statusBar.showMessage(f"Fichier créé: {new_file_path}")
+            except Exception as e:
+                self.statusBar.showMessage(f"Erreur lors de la création du fichier: {str(e)}")
+                QMessageBox.warning(self, "Erreur", f"Impossible de créer le fichier: {str(e)}")
+    
+    def rename_item(self, index):
+        """Renomme un élément (fichier ou dossier) dans l'arborescence"""
+        from PyQt5.QtWidgets import QInputDialog
+        import os
+        import shutil
+        
+        # Récupérer le chemin de l'élément sélectionné
+        old_path = self.fs_model2.filePath(index)
+        old_name = os.path.basename(old_path)
+        parent_dir = os.path.dirname(old_path)
+        
+        # Demander le nouveau nom
+        new_name, ok = QInputDialog.getText(self, "Renommer", "Nouveau nom:", text=old_name)
+        
+        if ok and new_name and new_name != old_name:
+            # Renommer l'élément
+            new_path = os.path.join(parent_dir, new_name)
+            try:
+                # Vérifier si la destination existe déjà
+                if os.path.exists(new_path):
+                    QMessageBox.warning(self, "Erreur", f"Un élément nommé '{new_name}' existe déjà")
+                    return
+                
+                # Renommer
+                os.rename(old_path, new_path)
+                self.statusBar.showMessage(f"Élément renommé: {old_path} -> {new_path}")
+            except Exception as e:
+                self.statusBar.showMessage(f"Erreur lors du renommage: {str(e)}")
+                QMessageBox.warning(self, "Erreur", f"Impossible de renommer l'élément: {str(e)}")
+    
+    def delete_item(self, path):
+        """Supprime un élément (fichier ou dossier) dans l'arborescence"""
+        import os
+        import shutil
+        
+        # Demander confirmation
+        item_name = os.path.basename(path)
+        is_dir = os.path.isdir(path)
+        item_type = "dossier" if is_dir else "fichier"
+        
+        reply = QMessageBox.question(self, "Confirmation", 
+                                    f"Voulez-vous vraiment supprimer {item_type} '{item_name}' ?",
+                                    QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        
+        if reply == QMessageBox.Yes:
+            try:
+                # Supprimer l'élément
+                if is_dir:
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+                self.statusBar.showMessage(f"{item_type.capitalize()} supprimé: {path}")
+            except Exception as e:
+                self.statusBar.showMessage(f"Erreur lors de la suppression: {str(e)}")
+                QMessageBox.warning(self, "Erreur", f"Impossible de supprimer l'élément: {str(e)}")
 
     def set_second_tree_root(self, path):
         # Déclarer la fonction locale set_index avant toute déconnexion
@@ -119,17 +249,112 @@ class MainWindow(QMainWindow):
             self.fs_model2.directoryLoaded.connect(set_index)
 
     def on_project_selected(self, selected, deselected):
-        # Afficher le dossier du projet sélectionné dans la 2ème arborescence
-        indexes = self.project_table.selectedIndexes()
+        """Gestion de la sélection d'un projet dans la table"""
+        indexes = selected.indexes()
         if not indexes:
             return
+        
+        # Récupération de l'index de la ligne sélectionnée
         row = indexes[0].row()
-        # Récupérer le projet dans le modèle de table
-        if 0 <= row < len(self.project_model._data):
-            project = self.project_model._data[row]
-            folder = project.get('source')
-            if folder:
-                self.set_second_tree_root(folder)
+        
+        # Récupération des détails du projet
+        project = self.project_model._data[row]
+        source_folder = project.get('source')
+        project_name = project.get('project_name')
+        
+        # Affichage des tags du projet
+        self.display_project_tags(project_name)
+        
+        # Mise à jour de la note du projet
+        rating = project.get('rating', 0)
+        self.update_rating_buttons(rating)
+        
+        # Vérifier si nous sommes en mode workspace et si l'élément est un dossier
+        if self.app_mode == 'workspace' and project.get('type') == 'folder':
+            # En mode workspace, utiliser directement le chemin du dossier
+            project_folder = project.get('path')
+            if project_folder and os.path.exists(project_folder):
+                try:
+                    self.set_second_tree_root(project_folder)
+                    print(f"Arborescence du dossier mise à jour (mode workspace): {project_folder}")
+                    self.statusBar.showMessage(f"Dossier sélectionné: {project_folder}")
+                    return
+                except Exception as e:
+                    print(f"Erreur lors de la mise à jour de l'arborescence du dossier: {e}")
+                    self.statusBar.showMessage(f"Erreur lors de l'affichage du dossier: {str(e)[:100]}")
+            return
+        
+        # Pour le mode multi-sources ou si le chemin direct n'a pas fonctionné
+        # Recherche du dossier du projet
+        project_folder = None
+        
+        # Stratégie 1: Utiliser le chemin du premier fichier CPR s'il existe
+        cpr_files = project.get('cpr_files', [])
+        if cpr_files and len(cpr_files) > 0:
+            # Utiliser le premier fichier CPR pour déterminer le dossier du projet
+            cpr_path = cpr_files[0]
+            if os.path.exists(cpr_path):
+                project_folder = os.path.dirname(cpr_path)
+                print(f"Dossier du projet trouvé via fichier CPR: {project_folder}")
+        
+        # Stratégie 2: Rechercher un dossier avec le nom exact du projet dans le dossier source
+        if not project_folder and source_folder and os.path.exists(source_folder):
+            potential_project_folder = os.path.join(source_folder, project_name)
+            if os.path.exists(potential_project_folder) and os.path.isdir(potential_project_folder):
+                project_folder = potential_project_folder
+                print(f"Dossier du projet trouvé via nom exact: {project_folder}")
+        
+        # Stratégie 3: Rechercher un dossier qui contient le nom du projet
+        if not project_folder and source_folder and os.path.exists(source_folder):
+            try:
+                for root, dirs, files in os.walk(source_folder):
+                    for dir_name in dirs:
+                        if project_name.lower() in dir_name.lower():
+                            potential_project_folder = os.path.join(root, dir_name)
+                            project_folder = potential_project_folder
+                            print(f"Dossier du projet trouvé via recherche partielle: {project_folder}")
+                            break
+                    if project_folder:
+                        break
+            except Exception as e:
+                print(f"Erreur lors de la recherche du dossier du projet: {e}")
+        
+        # Stratégie 4: Rechercher des fichiers du projet dans le dossier source
+        if not project_folder and source_folder and os.path.exists(source_folder):
+            try:
+                for root, dirs, files in os.walk(source_folder):
+                    for file in files:
+                        if project_name.lower() in file.lower() and file.endswith(('.cpr', '.bak')):
+                            project_folder = root
+                            print(f"Dossier du projet trouvé via fichiers du projet: {project_folder}")
+                            break
+                    if project_folder:
+                        break
+            except Exception as e:
+                print(f"Erreur lors de la recherche des fichiers du projet: {e}")
+        
+        # Si aucun dossier spécifique n'a été trouvé, utiliser le dossier source
+        if not project_folder and source_folder and os.path.exists(source_folder):
+            project_folder = source_folder
+            print(f"Utilisation du dossier source comme dossier du projet: {project_folder}")
+        
+        # Mise à jour de l'arborescence du projet
+        if project_folder and os.path.exists(project_folder):
+            try:
+                self.set_second_tree_root(project_folder)
+                print(f"Arborescence du projet mise à jour: {project_folder}")
+                self.statusBar.showMessage(f"Projet sélectionné: {project_name} - Dossier: {project_folder}")
+            except Exception as e:
+                print(f"Erreur lors de la mise à jour de l'arborescence du projet: {e}")
+                # En cas d'erreur, utiliser le dossier source
+                if source_folder and os.path.exists(source_folder):
+                    try:
+                        self.set_second_tree_root(source_folder)
+                        print(f"Arborescence du projet mise à jour avec le dossier source: {source_folder}")
+                        self.statusBar.showMessage(f"Projet sélectionné: {project_name} - Dossier source: {source_folder}")
+                    except Exception as e2:
+                        print(f"Erreur lors de la mise à jour de l'arborescence avec le dossier source: {e2}")
+                        self.statusBar.showMessage(f"Erreur lors de l'affichage du dossier source: {str(e2)[:100]}")
 
     def __init__(self):
         """Initialisation de la fenêtre principale"""
@@ -636,6 +861,7 @@ class MainWindow(QMainWindow):
 
     def on_app_mode_changed(self, index):
         if index == 0:
+            # Mode multi-sources
             self.app_mode = 'multi_sources'
             self.action_select_workspace.setVisible(False)
             self.dir_group.setVisible(True)
@@ -650,12 +876,17 @@ class MainWindow(QMainWindow):
             if hasattr(self, 'statusBar'):
                 self.statusBar.showMessage("Mode multi-sources : aucun projet affiché")
         else:
+            # Mode workspace (unique)
             self.app_mode = 'workspace'
             self.action_select_workspace.setVisible(True)
             self.dir_group.setVisible(False)
-            # Lancer scan automatique du workspace si déjà choisi
+            
+            # Si un dossier de travail est déjà défini, configurer la vue workspace
             if self.workspace_dir:
-                self.scan_workspace_projects()
+                self.setup_workspace_view(self.workspace_dir)
+            else:
+                # Sinon, demander à l'utilisateur de sélectionner un dossier de travail
+                self.statusBar.showMessage("Veuillez sélectionner un dossier de travail")
 
     def select_workspace_dir(self):
         dir_path = QFileDialog.getExistingDirectory(self, "Choisir le dossier de travail (workspace)")
@@ -666,9 +897,115 @@ class MainWindow(QMainWindow):
                 self.lbl_workspace_path.setText(f"Dossier de travail : {self.workspace_dir}")
             # Sauvegarder immédiatement le workspace dans les préférences
             self.save_preferences()
-            # Utiliser la logique du mode tri : scan_directories sur ce dossier unique
-            self.selected_directories = [dir_path]
-            self.scan_directories()
+            
+            # En mode workspace, configurer la vue spécifique pour le dossier de travail
+            if self.app_mode == 'workspace':
+                self.setup_workspace_view(dir_path)
+            else:
+                # En mode multi-sources, utiliser la logique du scan standard
+                self.selected_directories = [dir_path]
+                self.scan_directories()
+    
+    def setup_workspace_view(self, workspace_dir):
+        """Configure l'affichage pour le mode workspace (unique)
+        
+        Args:
+            workspace_dir (str): Chemin du dossier de travail
+        """
+        try:
+            # Vérifier que le dossier existe
+            if not os.path.exists(workspace_dir):
+                self.statusBar.showMessage(f"Erreur: Le dossier {workspace_dir} n'existe pas")
+                return
+                
+            # Configurer la première vue d'arborescence (gauche) - Vue complète du workspace
+            self.fs_model.setRootPath(workspace_dir)
+            self.project_tree_view.setRootIndex(self.fs_model.index(workspace_dir))
+            
+            # Configurer la deuxième vue d'arborescence (droite) - Également vue complète du workspace
+            self.fs_model2.setRootPath(workspace_dir)
+            self.project_tree_view2.setRootIndex(self.fs_model2.index(workspace_dir))
+            
+            # Mettre à jour la barre de statut
+            self.statusBar.showMessage(f"Mode espace de travail unique : {workspace_dir}")
+            
+            # Stocker le répertoire sélectionné pour le scan
+            self.selected_directories = [workspace_dir]
+            
+            # Scanner le dossier pour trouver les fichiers Cubase et les métadonnées
+            # mais trier par dossier plutôt que par projet
+            self.scan_workspace_folders(workspace_dir)
+            
+        except Exception as e:
+            self.statusBar.showMessage(f"Erreur lors de la configuration du mode workspace: {str(e)}")
+            print(f"Erreur lors de la configuration du mode workspace: {e}")
+    
+    def scan_workspace_folders(self, workspace_dir):
+        """Scan le dossier workspace et organise les résultats par dossier plutôt que par projet
+        
+        Args:
+            workspace_dir (str): Chemin du dossier de travail
+        """
+        try:
+            # Initialiser la liste des résultats
+            results = []
+            
+            # Parcourir tous les dossiers et fichiers du workspace
+            for root, dirs, files in os.walk(workspace_dir):
+                # Pour chaque dossier trouvé
+                for dir_name in dirs:
+                    dir_path = os.path.join(root, dir_name)
+                    # Ne traiter que les dossiers de premier niveau par rapport au workspace
+                    if os.path.dirname(dir_path) == workspace_dir:
+                        # Créer une entrée pour ce dossier
+                        folder_entry = {
+                            'project_name': dir_name,  # Utiliser le nom du dossier comme nom de projet
+                            'source': workspace_dir,
+                            'path': dir_path,
+                            'cpr_files': [],
+                            'bak_files': [],
+                            'wav_files': [],
+                            'last_modified': datetime.datetime.fromtimestamp(os.path.getmtime(dir_path)).strftime('%Y-%m-%d %H:%M:%S'),
+                            'size': self.get_folder_size(dir_path),
+                            'type': 'folder'  # Indiquer qu'il s'agit d'un dossier et non d'un projet
+                        }
+                        
+                        # Ajouter les métadonnées si disponibles
+                        try:
+                            metadata = self.metadata_manager.get_project_metadata(dir_name, dir_path)
+                            if metadata:
+                                folder_entry.update(metadata)
+                        except Exception as e:
+                            print(f"Erreur lors de la récupération des métadonnées pour {dir_name}: {e}")
+                        
+                        results.append(folder_entry)
+            
+            # Mettre à jour le modèle de données avec les résultats
+            self.project_model.update_data(results)
+            
+            # Mettre à jour la barre de statut
+            self.statusBar.showMessage(f"Scan terminé: {len(results)} dossiers trouvés dans le workspace")
+            
+        except Exception as e:
+            self.statusBar.showMessage(f"Erreur lors du scan du workspace: {str(e)}")
+            print(f"Erreur lors du scan du workspace: {e}")
+    
+    def get_folder_size(self, folder_path):
+        """Calcule la taille totale d'un dossier en octets
+        
+        Args:
+            folder_path (str): Chemin du dossier
+            
+        Returns:
+            int: Taille du dossier en octets
+        """
+        total_size = 0
+        for dirpath, dirnames, filenames in os.walk(folder_path):
+            for filename in filenames:
+                file_path = os.path.join(dirpath, filename)
+                if os.path.exists(file_path) and os.path.isfile(file_path):
+                    total_size += os.path.getsize(file_path)
+        return total_size
 
     def scan_workspace_projects(self):
         """Scan du dossier workspace pour détecter tous les projets Cubase et charger leurs métadonnées locales"""

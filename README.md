@@ -29,8 +29,9 @@ Il devient difficile de s'y retrouver lorsque plusieurs versions d'un même proj
 - **Deux modes d'affichage** : par projet ou par dossier
 - **Mode "espace de travail unique" (workspace)** :
   - Dès qu'un dossier workspace est sélectionné, un scan complet est lancé automatiquement
+  - Affichage de l'arborescence complète du dossier sélectionné dans les deux vues
+  - Organisation des résultats par dossier plutôt que par projet
   - Toutes les fonctionnalités avancées (détails, tags, tri, aperçu audio, etc.) sont disponibles sans limitation
-  - Le fonctionnement est identique au mode multi-sources, mais sur un seul dossier
 - **Coloration des sources** pour une meilleure distinction visuelle
 - Regroupement des fichiers par source dans la vue détaillée
 - Mise en évidence des fichiers les plus récents
@@ -174,21 +175,25 @@ python main.py
 - ✅ Option pour ajouter une note au format txt intégrée au répertoire de sauvegarde
 - ✅ Possibilité de lancer le projet dans Cubase à partir de l'application
 - ✅ Système de tags et notation à étoiles pour les projets
-- ✅ ouvrir l'application directement en mode "unique"
-- ✅ Garder en memoire le chemin de cubase.exe (demande d'emplacement demander au premier lancement)
+- ✅ Ouvrir l'application directement en mode "unique"
+- ✅ Garder en mémoire le chemin de cubase.exe (demande d'emplacement au premier lancement)
+- ✅ Affichage de l'arborescence du projet/dossier sélectionné dans la deuxième fenêtre
+- ✅ Mode workspace amélioré avec organisation par dossier
 
 ## 🔮 Évolutions futures
 
-- 1/2 ajouter une fenetre a coté du detail du projet dans les deux modes pour afficher l'arborescence du dossier du projet et de permettre la manipulation des elément, ajout, deplacement, suppression, glisser/deposer
+- (100%) Ajout d'une fenêtre à côté du détail du projet dans les deux modes pour afficher l'arborescence du dossier du projet et permettre la manipulation des éléments (ajout, déplacement, suppression)
 - redimensionnement des fenetres
 - Amélioration continue de l'interface utilisateur (lecteur audio, interface utilisateur, etc.)
 - Exportation/importation des métadonnées (tags et notes) et sauvegardes dans un fichier json inclut dans le répertoire du projet
 - Optimisation des performances pour les collections de projets très volumineuses
 - Support multiplateforme amélioré (macOS, Linux)
 
-## 🔮 Problèmes
+## 🔮 Problèmes résolus
 
- la deuxieme fenetre d'arborescence n'affiche pas l'arborescence du projet sélectionné dans la fenetre resultats 
+- ~~La deuxième fenêtre d'arborescence n'affiche pas l'arborescence du projet sélectionné dans la fenêtre résultats~~ : **Résolu**
+  - En mode multi-sources : Affiche maintenant correctement l'arborescence du projet sélectionné en utilisant plusieurs stratégies de recherche
+  - En mode workspace : Affiche directement l'arborescence du dossier sélectionné
 
 ## 🔮 Évolutions possibles secondaires
 - ajouter une option (case a cocher) pour garder en memoire le repertoire de travail du mode unique lors des futures ouverture de l'application
