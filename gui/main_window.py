@@ -71,6 +71,9 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Tri Morceaux Cubase")
         self.setMinimumSize(1000, 700)
         
+        # Mode d'application : 'multi_sources' (par défaut) ou 'workspace'
+        self.app_mode = 'multi_sources'  # ou 'workspace'
+        self.workspace_dir = None
         self.setup_ui()
     
     def closeEvent(self, event):
@@ -93,11 +96,16 @@ class MainWindow(QMainWindow):
                     app.setStyleSheet(f.read())
                 self.action_toggle_theme.setText("Mode clair")
                 print("Mode sombre activé")
+            # Synchroniser le modèle
+            self.project_model.dark_mode = True
+            self.project_model.layoutChanged.emit()
         else:
             # Mode clair
             app.setStyleSheet("")
             self.action_toggle_theme.setText("Mode sombre")
             print("Mode clair activé")
+            self.project_model.dark_mode = False
+            self.project_model.layoutChanged.emit()
     
     def save_preferences(self):
         """Sauvegarde des préférences utilisateur"""
@@ -194,7 +202,10 @@ class MainWindow(QMainWindow):
         dir_layout.addWidget(self.dir_list)
         dir_layout.addWidget(self.btn_scan)
         dir_layout.addWidget(self.progress_bar)
-        
+        # Par défaut, le groupe est visible (mode multi-sources)
+        dir_group.setVisible(True)
+        self.dir_group = dir_group
+
         # Groupe pour les résultats
         results_group = QGroupBox("Résultats")
         results_layout = QVBoxLayout(results_group)
@@ -420,52 +431,102 @@ class MainWindow(QMainWindow):
         self.setStatusBar(self.statusBar)
         self.statusBar.showMessage("Prêt")
     
+    def add_directory(self):
+        """Ajout d'un dossier à scanner"""
+        directory = QFileDialog.getExistingDirectory(self, "Sélectionner un dossier", str(Path.home()))
+        if directory and directory not in self.selected_directories:
+            self.selected_directories.append(directory)
+            item = QTreeWidgetItem([directory])
+            self.dir_list.addTopLevelItem(item)
+            self.btn_scan.setEnabled(True)
+
     def setup_toolbar(self):
         """Configuration de la barre d'outils"""
         toolbar = QToolBar("Barre d'outils principale")
         toolbar.setIconSize(QSize(24, 24))
         self.addToolBar(toolbar)
-        
-        # Actions
-        action_scan = QAction("Scanner", self)
-        action_scan.triggered.connect(self.scan_directories)
-        toolbar.addAction(action_scan)
-        
+
+        # Action pour basculer le thème (mode sombre)
+        self.action_toggle_theme = QAction("Mode sombre", self)
+        self.action_toggle_theme.setCheckable(True)
+        self.action_toggle_theme.toggled.connect(self.toggle_theme)
+        toolbar.addAction(self.action_toggle_theme)
+
+        # Action pour sauvegarder
         action_save = QAction("Sauvegarder", self)
         action_save.triggered.connect(self.save_selected_project)
         toolbar.addAction(action_save)
         
         toolbar.addSeparator()
-        
-        # Action pour basculer le thème
-        self.action_toggle_theme = QAction("Mode sombre", self)
-        self.action_toggle_theme.setCheckable(True)
-        self.action_toggle_theme.triggered.connect(self.toggle_theme)
-        toolbar.addAction(self.action_toggle_theme)
-        
-        # Charger l'état du thème depuis les préférences
-        self.load_preferences()
-        
-        toolbar.addSeparator()
-        
-        action_quit = QAction("Quitter", self)
-        action_quit.triggered.connect(self.close)
-        toolbar.addAction(action_quit)
-    
-    @pyqtSlot()
-    def add_directory(self):
-        """Ajout d'un dossier à scanner"""
-        directory = QFileDialog.getExistingDirectory(
-            self, "Sélectionner un dossier", str(Path.home())
-        )
-        
-        if directory:
-            # Vérification que le dossier n'est pas déjà dans la liste
-            if directory not in self.selected_directories:
-                self.selected_directories.append(directory)
-                item = QTreeWidgetItem([directory])
-                self.dir_list.addTopLevelItem(item)
-                self.btn_scan.setEnabled(True)
+
+        # Sélecteur de mode global (multi-sources / espace de travail)
+        self.cmb_app_mode = QComboBox()
+        self.cmb_app_mode.addItems(["Mode multi-sources (tri)", "Mode espace de travail unique"])
+        self.cmb_app_mode.currentIndexChanged.connect(self.on_app_mode_changed)
+        toolbar.addWidget(QLabel("Mode : "))
+        toolbar.addWidget(self.cmb_app_mode)
+
+        # Action pour choisir le dossier de travail (workspace)
+        self.action_select_workspace = QAction("Choisir dossier de travail...", self)
+        self.action_select_workspace.triggered.connect(self.select_workspace_dir)
+        toolbar.addAction(self.action_select_workspace)
+        self.action_select_workspace.setVisible(False)
+
+    def on_app_mode_changed(self, index):
+        if index == 0:
+            self.app_mode = 'multi_sources'
+            self.action_select_workspace.setVisible(False)
+            self.dir_group.setVisible(True)
+        else:
+            self.app_mode = 'workspace'
+            self.action_select_workspace.setVisible(True)
+            self.dir_group.setVisible(False)
+            # Optionnel : lancer scan automatique du workspace si déjà choisi
+            if self.workspace_dir:
+                self.scan_workspace_projects()
+
+    def select_workspace_dir(self):
+        dir_path = QFileDialog.getExistingDirectory(self, "Choisir le dossier de travail (workspace)")
+        if dir_path:
+            self.workspace_dir = dir_path
+            # Utiliser la logique du mode tri : scan_directories sur ce dossier unique
+            self.selected_directories = [dir_path]
+            self.scan_directories()
+
+    def scan_workspace_projects(self):
+        """Scan du dossier workspace pour détecter tous les projets Cubase et charger leurs métadonnées locales"""
+        if not self.workspace_dir:
+            return
+        projects = []
+        for root, dirs, files in os.walk(self.workspace_dir):
+            for file in files:
+                if file.endswith('.cpr'):
+                    project_dir = root
+                    project_name = os.path.splitext(file)[0]
+                    # Lecture des métadonnées locales
+                    from utils.metadata_manager import MetadataManager
+                    meta_mgr = MetadataManager(mode='local')
+                    metadata = meta_mgr.get_project_metadata(project_name, project_dir)
+                    # Ajout à la liste
+                    projects.append({
+                        'project_name': project_name,
+                        'source': project_dir,
+                        'latest_cpr_date': None,  # À calculer si besoin
+                        'cpr_count': 1,  # à ajuster
+                        'bak_count': len([f for f in os.listdir(project_dir) if f.endswith('.bak')]),
+                        'wav_count': len([f for f in os.listdir(project_dir) if f.endswith('.wav')]),
+                        'total_size_mb': round(sum(os.path.getsize(os.path.join(project_dir, f)) for f in os.listdir(project_dir) if os.path.isfile(os.path.join(project_dir, f))) / 1048576, 2),
+                        'rating': metadata.get('rating', 0),
+                        'metadata': metadata
+                    })
+        # Mise à jour du modèle
+        self.project_model._data = projects
+        self.project_model.layoutChanged.emit()
+        # Efface la sélection
+        self.project_table.clearSelection()
+        # Affiche un message si aucun projet trouvé
+        if not projects:
+            QMessageBox.information(self, "Aucun projet trouvé", "Aucun projet Cubase (.cpr) trouvé dans ce dossier.")
     
     @pyqtSlot()
     def clear_directories(self):
@@ -873,6 +934,15 @@ class MainWindow(QMainWindow):
         
         # Récupération des détails du projet
         project = self.scanner.get_project_details(project_name)
+        # Correction : recherche alternative si None (mode workspace)
+        if project is None:
+            for key in self.scanner.projects.keys():
+                if project_name == key or project_name in key or key in project_name:
+                    project = self.scanner.projects[key]
+                    break
+        if project is None or 'cpr_files' not in project or not isinstance(project['cpr_files'], list):
+            QMessageBox.warning(self, "Projet introuvable ou corrompu", "Impossible d'afficher les détails de ce projet.")
+            return
         
         # Mise à jour de l'arbre des fichiers
         self.file_tree.clear()

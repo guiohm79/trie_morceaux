@@ -12,6 +12,7 @@ from PyQt5.QtGui import QColor, QBrush
 
 class ProjectTableModel(QAbstractTableModel):
     """Modèle de données pour l'affichage des projets dans un tableau"""
+    dark_mode = False  # Ajouté : mode sombre activé ou non
     
     def __init__(self, parent=None):
         """Initialisation du modèle"""
@@ -106,17 +107,21 @@ class ProjectTableModel(QAbstractTableModel):
         
         # Coloration des lignes en fonction de la source
         elif role == Qt.BackgroundRole:
+            # Alternance de gris foncé en mode sombre
+            if getattr(self, "dark_mode", False):
+                if row % 2 == 0:
+                    return QBrush(QColor("#232629"))
+                else:
+                    return QBrush(QColor("#2d2f31"))
+            # Sinon, coloration par source (mode clair)
             source = self._data[row].get('source', '')
-            
             # Si c'est une source multiple, pas de coloration spécifique
             if source == "Plusieurs sources":
                 return QVariant()
-            
             # Sinon, attribuer une couleur à la source si ce n'est pas déjà fait
             if source not in self._source_to_color and source:
                 self._source_to_color[source] = self._colors[self._color_index % len(self._colors)]
                 self._color_index += 1
-            
             # Retourner la couleur associée à la source
             if source in self._source_to_color:
                 return QBrush(self._source_to_color[source])

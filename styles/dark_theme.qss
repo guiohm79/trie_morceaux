@@ -1,15 +1,18 @@
-/* Feuille de style pour le mode sombre */
+/* Feuille de style pour le mode sombre améliorée */
 
 /* Style global */
 QWidget {
-    background-color: #2D2D30;
+    background-color: #232629;
     color: #E0E0E0;
     font-family: Segoe UI, Arial, sans-serif;
 }
 
-/* Fenêtre principale */
 QMainWindow {
     background-color: #252526;
+}
+
+QLabel, QTabWidget::pane, QTabBar::tab {
+    color: #E0E0E0;
 }
 
 /* Boutons */
@@ -20,15 +23,12 @@ QPushButton {
     padding: 5px 10px;
     color: #E0E0E0;
 }
-
 QPushButton:hover {
     background-color: #505050;
 }
-
 QPushButton:pressed {
     background-color: #007ACC;
 }
-
 QPushButton:disabled {
     background-color: #2D2D30;
     color: #656565;
@@ -40,8 +40,8 @@ QGroupBox {
     border-radius: 5px;
     margin-top: 1.5ex;
     padding-top: 1.5ex;
+    color: #E0E0E0;
 }
-
 QGroupBox::title {
     subcontrol-origin: margin;
     subcontrol-position: top center;
@@ -50,19 +50,17 @@ QGroupBox::title {
 }
 
 /* Tableaux */
-QTableView {
-    background-color: #252526;
+QTableView, QTableWidget {
+    background-color: #232629;
     border: 1px solid #3E3E42;
-    gridline-color: #3E3E42;
+    gridline-color: #444;
     color: #E0E0E0;
-    selection-background-color: #007ACC;
-    selection-color: #FFFFFF;
+    selection-background-color: #44475a;
+    selection-color: #ffffff;
 }
-
-QTableView::item:hover {
+QTableView::item:hover, QTableWidget::item:hover {
     background-color: #3E3E42;
 }
-
 QHeaderView::section {
     background-color: #3E3E42;
     color: #E0E0E0;
@@ -72,30 +70,62 @@ QHeaderView::section {
 
 /* Arborescence */
 QTreeWidget {
-    background-color: #252526;
+    background-color: #232629;
     border: 1px solid #3E3E42;
     color: #E0E0E0;
 }
-
 QTreeWidget::item {
     padding: 3px;
     color: #E0E0E0;
     background-color: transparent;
 }
-
 QTreeWidget::item:hover {
     background-color: #3E3E42;
 }
-
 QTreeWidget::item:selected {
     background-color: #007ACC;
     color: #FFFFFF;
 }
-
-/* Style spécifique pour les éléments de l'arborescence des détails du projet */
 QTreeWidget#file_tree {
     background-color: #1E1E1E;
     border: 1px solid #3E3E42;
+}
+
+/* Entrées et textes */
+QLineEdit, QTextEdit, QPlainTextEdit {
+    background-color: #2d2f31;
+    color: #E0E0E0;
+    border: 1px solid #444;
+    selection-background-color: #44475a;
+    selection-color: #ffffff;
+}
+
+QComboBox, QComboBox QAbstractItemView {
+    background-color: #2d2f31;
+    color: #E0E0E0;
+    border: 1px solid #444;
+    selection-background-color: #44475a;
+    selection-color: #ffffff;
+}
+
+QTabWidget::pane {
+    border: 1px solid #444;
+}
+QTabBar::tab {
+    background: #232629;
+    color: #E0E0E0;
+    border: 1px solid #444;
+    padding: 5px;
+}
+QTabBar::tab:selected {
+    background: #44475a;
+    color: #ffffff;
+}
+
+QStatusBar {
+    background: #232629;
+    color: #E0E0E0;
+    border-top: 1px solid #444;
 }
 
 QTreeWidget#file_tree::item {

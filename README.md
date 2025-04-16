@@ -24,9 +24,13 @@ Il devient difficile de s'y retrouver lorsque plusieurs versions d'un même proj
 - Identification des fichiers `.cpr`, `.bak`, et `.wav`
 - Suivi de la source (dossier d'origine) de chaque fichier
 
-### 2. Visualisation multi-sources
+### 2. Visualisation multi-sources et mode workspace
 - Tableau des projets avec indication de leur source
 - **Deux modes d'affichage** : par projet ou par dossier
+- **Mode "espace de travail unique" (workspace)** :
+  - Dès qu'un dossier workspace est sélectionné, un scan complet est lancé automatiquement
+  - Toutes les fonctionnalités avancées (détails, tags, tri, aperçu audio, etc.) sont disponibles sans limitation
+  - Le fonctionnement est identique au mode multi-sources, mais sur un seul dossier
 - **Coloration des sources** pour une meilleure distinction visuelle
 - Regroupement des fichiers par source dans la vue détaillée
 - Mise en évidence des fichiers les plus récents
@@ -92,6 +96,7 @@ python main.py
 4. **Choix du mode d'affichage** :
    - Basculez entre la vue "Par projet" et "Par dossier" avec le sélecteur dans la barre d'outils
    - Activez le mode sombre si vous préférez une interface plus sombre
+   - En mode "espace de travail unique", sélectionnez simplement votre dossier : le scan démarre automatiquement et toutes les fonctionnalités (tri, tags, détails, aperçu audio...) sont accessibles comme en mode multi-sources
 
 5. **Exploration** : 
    - Utilisez le champ de recherche pour filtrer les projets par nom
@@ -171,8 +176,9 @@ python main.py
 - ✅ Système de tags et notation à étoiles pour les projets
 
 ## 🔮 Évolutions futures
-
-- Permettre a l'utilsateur de mieux gerer ses projets a l'aide de cette application en selectionnant un projet, visualiser toutes les infos, styles de musique, BPM, notes (sur 5etoiles), tags, versioning avancé des projets   
+- ouvrir l'application directement en mode "unique"
+- versioning avancé des projets   
+- en mode unique,pouvoir supprimer des elements d'un projets et d'enregistrer les modifications directement dans le repertoire de travail
 - Amélioration continue de l'interface utilisateur
 - Exportation/importation des métadonnées (tags et notes) et sauvegardes dans un fichier json inclut dans le repertoire du projet
 - Optimisation des performances pour les collections de projets très volumineuses
@@ -180,7 +186,7 @@ python main.py
 
 
 ## 🔮 Évolutions possibles secondaires
-
+- garder en memoire le repertoire de travail du mode unique
 - Intégration avec des services cloud pour la sauvegarde
 - Synchronisation automatique entre plusieurs sources
 - Statistiques d'utilisation et rapports sur vos projets
