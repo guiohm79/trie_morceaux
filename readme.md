@@ -24,6 +24,10 @@ Le projet a été restructuré selon l'architecture proposée dans le cahier des
    - Correction des noms de colonnes pour qu'ils correspondent à leur contenu
    - Ajustement automatique de la largeur des colonnes pour une meilleure lisibilité
    - Mise en place d'une disposition horizontale plus intuitive pour les arborescences
+   - Simplification de l'interface avec suppression des barres de navigation
+   - Ajout de la fonctionnalité de glisser-déposer entre les arborescences
+   - Possibilité de copier ou déplacer des fichiers par glisser-déposer
+   - Sélection multiple de fichiers pour les opérations de glisser-déposer
 
 3. **Gestion des métadonnées** :
    - Amélioration de la sauvegarde des métadonnées en mode local et centralisé
@@ -55,6 +59,8 @@ Le projet a été restructuré selon l'architecture proposée dans le cahier des
    - Optimisation de l'affichage des colonnes et de leur largeur
    - Correction des noms de colonnes pour qu'ils correspondent à leur contenu
    - Mise en place d'une disposition horizontale plus intuitive pour les arborescences
+   - Simplification de l'interface avec suppression des barres de navigation superflues
+   - Implémentation du glisser-déposer pour faciliter la gestion des fichiers
 
 3. **Gestion des threads** :
    - Ajout d'une méthode `closeEvent` pour gérer proprement la fermeture des fenêtres
@@ -75,6 +81,8 @@ Le projet a été restructuré selon l'architecture proposée dans le cahier des
    - Implémentation d'un thème personnalisable (au-delà du mode sombre)
    - Amélioration de la réactivité de l'interface lors du scan de grands dossiers
    - Ajout d'une barre de progression plus détaillée pour les opérations longues
+   - Amélioration des fonctionnalités de glisser-déposer avec des options avancées
+   - Ajout d'un menu contextuel pour les opérations de glisser-déposer
 
 2. **Gestion des métadonnées** :
    - Implémentation de l'auto-complétion pour les tags
@@ -176,6 +184,8 @@ L'application peut être lancée dans deux modes :
    - Ajouter une fonction de recherche de projets par mots-clés ou tags
    - ✅ Simplifier le comportement des cases à cocher dans l'interface
    - ✅ Améliorer l'affichage des sources de fichiers
+   - ✅ Implémenter le glisser-déposer entre les arborescences
+   - ✅ Simplifier l'interface en supprimant les éléments superflus
 
 2. **Gestion des métadonnées** :
    - Implémenter un système de tags hiérarchiques

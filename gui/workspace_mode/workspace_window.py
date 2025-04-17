@@ -6,18 +6,21 @@ Fenêtre principale du mode Espace de Travail (unique)
 """
 
 import os
+import re
+import shutil
 from pathlib import Path
-import datetime
+from datetime import datetime
+
 from PyQt5.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, 
     QPushButton, QLabel, QFileDialog,
     QGroupBox, QCheckBox, QMessageBox, QProgressBar,
     QSplitter, QTreeWidget, QTreeWidgetItem, QHeaderView,
     QComboBox, QAction, QLineEdit, QMenu, QTextEdit, QTabWidget,
-    QInputDialog
+    QInputDialog, QToolBar, QShortcut, QFrame, QToolButton
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
-from PyQt5.QtGui import QIcon
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize, QDir
+from PyQt5.QtGui import QIcon, QKeySequence
 
 from gui.base.base_window import BaseWindow
 from gui.components.audio_player import AudioPlayer
@@ -97,13 +100,43 @@ class WorkspaceWindow(BaseWindow):
         # Action pour choisir le dossier de travail
         self.action_select_workspace = QAction("Choisir dossier de travail...", self)
         self.action_select_workspace.triggered.connect(self.select_workspace_dir)
+        self.action_select_workspace.setShortcut(QKeySequence("Ctrl+O"))
+        self.action_select_workspace.setStatusTip("Sélectionner un dossier de travail")
         self.toolbar.addAction(self.action_select_workspace)
         
         # Action pour vider le workspace
         self.action_reset_workspace = QAction("Vider le workspace", self)
         self.action_reset_workspace.setToolTip("Réinitialiser le workspace")
         self.action_reset_workspace.triggered.connect(self.reset_workspace)
+        self.action_reset_workspace.setShortcut(QKeySequence("Ctrl+R"))
         self.toolbar.addAction(self.action_reset_workspace)
+        
+        # Séparateur
+        self.toolbar.addSeparator()
+        
+        # Action pour actualiser
+        self.action_refresh = QAction("Actualiser", self)
+        self.action_refresh.setToolTip("Actualiser le workspace")
+        self.action_refresh.triggered.connect(self.refresh_workspace)
+        self.action_refresh.setShortcut(QKeySequence("F5"))
+        self.toolbar.addAction(self.action_refresh)
+        
+        # Séparateur
+        self.toolbar.addSeparator()
+        
+        # Action pour créer un nouveau dossier
+        self.action_new_folder = QAction("Nouveau dossier", self)
+        self.action_new_folder.setToolTip("Créer un nouveau dossier")
+        self.action_new_folder.triggered.connect(lambda: self.create_new_folder(self.file_tree_right.get_selected_path() or self.workspace_dir))
+        self.action_new_folder.setShortcut(QKeySequence("Ctrl+Shift+N"))
+        self.toolbar.addAction(self.action_new_folder)
+        
+        # Action pour ouvrir le projet sélectionné dans Cubase
+        self.action_open_in_cubase = QAction("Ouvrir dans Cubase", self)
+        self.action_open_in_cubase.setToolTip("Ouvrir le projet sélectionné dans Cubase")
+        self.action_open_in_cubase.triggered.connect(self.open_selected_in_cubase)
+        self.action_open_in_cubase.setShortcut(QKeySequence("Ctrl+P"))
+        self.toolbar.addAction(self.action_open_in_cubase)
     
     def setup_ui(self):
         """Configuration de l'interface utilisateur"""
@@ -182,9 +215,18 @@ class WorkspaceWindow(BaseWindow):
         left_tree_layout = QVBoxLayout(left_tree_container)
         left_tree_layout.setContentsMargins(0, 0, 0, 0)
         left_tree_label = QLabel("<b>Navigation globale</b> - Dossier de travail complet")
+        
+        # Historique de navigation pour l'arborescence gauche (sans interface visible)
+        # Ces variables sont conservées pour les fonctionnalités d'historique
+        
         # Création de l'arborescence gauche avec la possibilité de remonter dans l'arborescence
         self.file_tree_left = FileTree(allow_navigation_up=True)
         self.file_tree_left.context_menu_requested.connect(self.show_file_tree_left_context_menu)
+        self.file_tree_left.files_dropped.connect(self.on_files_dropped_left)
+        
+        # Historique de navigation pour l'arborescence gauche
+        self.left_nav_history = []
+        self.left_nav_current = -1
         
         # Optimisation de l'affichage des colonnes pour l'arborescence gauche
         self.file_tree_left.header().setStretchLastSection(False)
@@ -209,8 +251,18 @@ class WorkspaceWindow(BaseWindow):
         right_tree_layout = QVBoxLayout(right_tree_container)
         right_tree_layout.setContentsMargins(0, 0, 0, 0)
         right_tree_label = QLabel("<b>Détails du projet</b> - Contenu du projet sélectionné")
+        
+        # Historique de navigation pour l'arborescence droite (sans interface visible)
+        # Ces variables sont conservées pour les fonctionnalités d'historique
+        
+        # Création de l'arborescence droite
         self.file_tree_right = FileTree()
         self.file_tree_right.context_menu_requested.connect(self.show_file_tree_right_context_menu)
+        self.file_tree_right.files_dropped.connect(self.on_files_dropped_right)
+        
+        # Historique de navigation pour l'arborescence droite
+        self.right_nav_history = []
+        self.right_nav_current = -1
         
         # Optimisation de l'affichage des colonnes pour l'arborescence droite
         self.file_tree_right.header().setStretchLastSection(False)
@@ -291,6 +343,12 @@ class WorkspaceWindow(BaseWindow):
         self.file_tree_left.item_selected.connect(self.on_file_tree_left_selected)
         self.file_tree_left.item_double_clicked.connect(self.on_file_tree_item_double_clicked)
         self.file_tree_right.item_double_clicked.connect(self.on_file_tree_item_double_clicked)
+        
+        # Connecter les signaux pour l'historique de navigation de l'arborescence droite
+        self.file_tree_right.fs_model.rootPathChanged.connect(self.on_file_tree_right_path_changed)
+        
+        # Initialiser l'état des boutons de navigation
+        self.update_navigation_buttons()
     
     def select_workspace_dir(self):
         """Sélection du dossier de travail"""
@@ -387,6 +445,41 @@ class WorkspaceWindow(BaseWindow):
         
         # Message de statut
         self.statusBar.showMessage("Workspace vidé")
+        
+    def refresh_workspace(self):
+        """Actualisation du workspace"""
+        if not self.workspace_dir or not os.path.exists(self.workspace_dir):
+            QMessageBox.warning(self, "Erreur", "Aucun dossier de travail sélectionné ou le dossier n'existe plus.")
+            return
+            
+        # Réinitialiser le scanner
+        self.scanner.clear()
+        
+        # Rescanner le dossier de travail
+        self.setup_workspace_view(self.workspace_dir)
+        
+        # Message de statut
+        self.statusBar.showMessage(f"Workspace actualisé : {len(self.all_projects_data)} projets trouvés")
+        
+    def open_selected_in_cubase(self):
+        """Ouvre le projet sélectionné dans Cubase"""
+        # Vérifier si un projet est sélectionné dans la table des projets
+        project = self.project_table.get_selected_project()
+        if project:
+            # Vérifier si le projet a un fichier CPR
+            if project.get('latest_cpr'):
+                self.cubase_service.open_project(project.get('latest_cpr'))
+                self.statusBar.showMessage(f"Ouverture du projet {project.get('project_name')} dans Cubase")
+                return
+                
+        # Vérifier si un fichier CPR est sélectionné dans l'arborescence de droite
+        selected_path = self.file_tree_right.get_selected_path()
+        if selected_path and selected_path.lower().endswith('.cpr'):
+            self.cubase_service.open_project(selected_path)
+            self.statusBar.showMessage(f"Ouverture du fichier {os.path.basename(selected_path)} dans Cubase")
+            return
+            
+        QMessageBox.warning(self, "Erreur", "Aucun projet Cubase sélectionné.")
     
     def filter_projects(self):
         """Filtrage des projets par nom"""
@@ -475,7 +568,44 @@ class WorkspaceWindow(BaseWindow):
             path (str): Chemin de l'élément sélectionné
         """
         if os.path.isdir(path):
+            # Mettre à jour l'arborescence de droite
             self.file_tree_right.set_root_path(path)
+            
+            # Mettre à jour l'historique de navigation de l'arborescence gauche
+            # Si nous sommes au milieu de l'historique, supprimer les entrées après l'index courant
+            if self.left_nav_current < len(self.left_nav_history) - 1:
+                self.left_nav_history = self.left_nav_history[:self.left_nav_current + 1]
+            
+            # Ajouter le chemin à l'historique s'il est différent du dernier
+            if not self.left_nav_history or self.left_nav_history[-1] != path:
+                self.left_nav_history.append(path)
+                self.left_nav_current = len(self.left_nav_history) - 1
+            
+            # Mettre à jour l'état des boutons de navigation
+            self.update_navigation_buttons()
+    
+    def on_file_tree_right_path_changed(self, path):
+        """
+        Gestion du changement de dossier dans l'arborescence de droite
+        
+        Args:
+            path (str): Nouveau chemin racine de l'arborescence
+        """
+        if not path or not os.path.exists(path):
+            return
+            
+        # Mettre à jour l'historique de navigation de l'arborescence droite
+        # Si nous sommes au milieu de l'historique, supprimer les entrées après l'index courant
+        if self.right_nav_current < len(self.right_nav_history) - 1:
+            self.right_nav_history = self.right_nav_history[:self.right_nav_current + 1]
+        
+        # Ajouter le chemin à l'historique s'il est différent du dernier
+        if not self.right_nav_history or self.right_nav_history[-1] != path:
+            self.right_nav_history.append(path)
+            self.right_nav_current = len(self.right_nav_history) - 1
+        
+        # Mettre à jour l'état des boutons de navigation
+        self.update_navigation_buttons()
     
     def on_file_tree_item_double_clicked(self, path):
         """
@@ -530,6 +660,126 @@ class WorkspaceWindow(BaseWindow):
         elif action == show_in_right_view_action:
             self.file_tree_right.set_root_path(path)
     
+    def update_navigation_buttons(self):
+        """Mise à jour de l'état des boutons de navigation"""
+        # Cette méthode ne fait plus rien car les boutons ont été supprimés
+        # L'historique de navigation est toujours conservé en arrière-plan
+        pass
+        
+    def on_files_dropped_left(self, source_paths, target_path):
+        """
+        Gestion du dépôt de fichiers dans l'arborescence gauche
+        
+        Args:
+            source_paths (list): Liste des chemins sources
+            target_path (str): Chemin cible
+        """
+        self._copy_or_move_files(source_paths, target_path)
+    
+    def on_files_dropped_right(self, source_paths, target_path):
+        """
+        Gestion du dépôt de fichiers dans l'arborescence droite
+        
+        Args:
+            source_paths (list): Liste des chemins sources
+            target_path (str): Chemin cible
+        """
+        self._copy_or_move_files(source_paths, target_path)
+    
+    def _copy_or_move_files(self, source_paths, target_path):
+        """
+        Copie ou déplacement de fichiers
+        
+        Args:
+            source_paths (list): Liste des chemins sources
+            target_path (str): Chemin cible
+        """
+        # Vérifier que le chemin cible existe
+        if not os.path.exists(target_path):
+            QMessageBox.warning(self, "Erreur", f"Le dossier cible {target_path} n'existe pas.")
+            return
+            
+        # Vérifier que le chemin cible est un dossier
+        if not os.path.isdir(target_path):
+            target_path = os.path.dirname(target_path)
+            
+        # Demander à l'utilisateur s'il veut copier ou déplacer
+        copy_button = QMessageBox.Yes
+        move_button = QMessageBox.No
+        cancel_button = QMessageBox.Cancel
+        
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Copier ou déplacer")
+        msg_box.setText(f"Voulez-vous copier ou déplacer {len(source_paths)} fichier(s) vers {target_path}?")
+        msg_box.addButton("Copier", QMessageBox.YesRole)
+        msg_box.addButton("Déplacer", QMessageBox.NoRole)
+        msg_box.addButton("Annuler", QMessageBox.RejectRole)
+        msg_box.setDefaultButton(QMessageBox.Yes)
+        
+        reply = msg_box.exec_()
+        
+        if reply == 2:  # Annuler (troisième bouton, index 2)
+            return
+            
+        is_move = (reply == 1)  # Déplacer (deuxième bouton, index 1)
+        operation_name = "Déplacement" if is_move else "Copie"
+        
+        # Copier ou déplacer chaque fichier
+        success_count = 0
+        error_count = 0
+        
+        for source_path in source_paths:
+            # Vérifier que le chemin source existe
+            if not os.path.exists(source_path):
+                error_count += 1
+                continue
+                
+            # Déterminer le chemin de destination
+            filename = os.path.basename(source_path)
+            dest_path = os.path.join(target_path, filename)
+            
+            # Vérifier si le fichier existe déjà à destination
+            if os.path.exists(dest_path):
+                # Demander confirmation pour écraser
+                overwrite_reply = QMessageBox.question(
+                    self,
+                    "Fichier existant",
+                    f"Le fichier {filename} existe déjà dans le dossier cible. Voulez-vous le remplacer?",
+                    QMessageBox.Yes | QMessageBox.No,
+                    QMessageBox.No
+                )
+                
+                if overwrite_reply == QMessageBox.No:
+                    continue
+            
+            try:
+                # Copier ou déplacer le fichier
+                if is_move:
+                    shutil.move(source_path, dest_path)
+                else:
+                    if os.path.isdir(source_path):
+                        # Copier un dossier avec son contenu
+                        shutil.copytree(source_path, dest_path)
+                    else:
+                        # Copier un fichier
+                        shutil.copy2(source_path, dest_path)
+                        
+                success_count += 1
+            except Exception as e:
+                QMessageBox.warning(self, "Erreur", f"Erreur lors de l'opération: {str(e)}")
+                error_count += 1
+        
+        # Afficher un résumé des opérations
+        if success_count > 0:
+            self.statusBar.showMessage(
+                f"{operation_name} terminée: {success_count} fichier(s) traité(s) avec succès" +
+                (f", {error_count} erreur(s)" if error_count > 0 else ""),
+                5000
+            )
+            
+            # Rafraîchir les arborescences
+            self.refresh_workspace()
+    
     def show_file_tree_right_context_menu(self, path, is_dir, position):
         """
         Affichage du menu contextuel pour l'arborescence de droite
@@ -555,6 +805,13 @@ class WorkspaceWindow(BaseWindow):
         rename_action = menu.addAction("Renommer")
         delete_action = menu.addAction("Supprimer")
         
+        # Ajouter une action pour ouvrir dans Cubase si c'est un fichier CPR
+        if not is_dir and path.lower().endswith('.cpr'):
+            menu.addSeparator()
+            open_in_cubase_action = menu.addAction("Ouvrir dans Cubase")
+        else:
+            open_in_cubase_action = None
+        
         # Affichage du menu
         action = menu.exec_(position)
         
@@ -573,6 +830,9 @@ class WorkspaceWindow(BaseWindow):
             self.rename_item(path)
         elif action == delete_action:
             self.delete_item(path)
+        elif action == open_in_cubase_action:
+            self.cubase_service.open_project(path)
+            self.statusBar.showMessage(f"Ouverture du fichier {os.path.basename(path)} dans Cubase")
     
     def create_new_folder(self, parent_path):
         """
@@ -637,29 +897,151 @@ class WorkspaceWindow(BaseWindow):
             else:
                 self.show_error("Erreur", f"Impossible de renommer l'élément: {path}")
     
-    def delete_item(self, path):
+    def navigate_back(self, tree_view):
+        """Navigation en arrière dans l'historique
+        
+        Args:
+            tree_view (FileTree): Arborescence à naviguer
         """
-        Suppression d'un élément
+        if tree_view == self.file_tree_left:
+            history = self.left_nav_history
+            current = self.left_nav_current
+        else:
+            history = self.right_nav_history
+            current = self.right_nav_current
+        
+        if current > 0:
+            current -= 1
+            path = history[current]
+            
+            # Désactiver temporairement la mise à jour de l'historique
+            tree_view.blockSignals(True)
+            tree_view.set_root_path(path)
+            tree_view.blockSignals(False)
+            
+            # Mettre à jour l'index courant
+            if tree_view == self.file_tree_left:
+                self.left_nav_current = current
+            else:
+                self.right_nav_current = current
+    
+    def navigate_forward(self, tree_view):
+        """Navigation en avant dans l'historique
+        
+        Args:
+            tree_view (FileTree): Arborescence à naviguer
+        """
+        if tree_view == self.file_tree_left:
+            history = self.left_nav_history
+            current = self.left_nav_current
+        else:
+            history = self.right_nav_history
+            current = self.right_nav_current
+        
+        if current < len(history) - 1:
+            current += 1
+            path = history[current]
+            
+            # Désactiver temporairement la mise à jour de l'historique
+            tree_view.blockSignals(True)
+            tree_view.set_root_path(path)
+            tree_view.blockSignals(False)
+            
+            # Mettre à jour l'index courant
+            if tree_view == self.file_tree_left:
+                self.left_nav_current = current
+            else:
+                self.right_nav_current = current
+    
+    def navigate_up(self, tree_view):
+        """Navigation vers le dossier parent
+        
+        Args:
+            tree_view (FileTree): Arborescence à naviguer
+        """
+        current_path = tree_view.get_selected_path()
+        if not current_path:
+            # Si aucun élément n'est sélectionné, utiliser le dossier racine
+            current_path = tree_view.fs_model.rootPath()
+        
+        if os.path.isdir(current_path):
+            parent_dir = os.path.dirname(current_path)
+        else:
+            parent_dir = os.path.dirname(os.path.dirname(current_path))
+        
+        if os.path.exists(parent_dir):
+            tree_view.set_root_path(parent_dir)
+    
+    def navigate_home(self, tree_view):
+        """Navigation vers le dossier de travail
+        
+        Args:
+            tree_view (FileTree): Arborescence à naviguer
+        """
+        if self.workspace_dir and os.path.exists(self.workspace_dir):
+            tree_view.set_root_path(self.workspace_dir)
+    
+    def filter_files(self, tree_view, filter_text):
+        """Filtrage des fichiers dans l'arborescence
+        
+        Args:
+            tree_view (FileTree): Arborescence à filtrer
+            filter_text (str): Texte de filtrage
+        """
+        if not filter_text:
+            # Réinitialiser le filtre
+            tree_view.fs_model.setNameFilters([])
+            tree_view.fs_model.setNameFilterDisables(True)
+            return
+        
+        # Créer un filtre basé sur le texte de recherche
+        # On utilise une expression régulière pour faire une recherche insensible à la casse
+        try:
+            regex = re.compile(filter_text, re.IGNORECASE)
+            
+            # Filtrer les éléments dans l'arborescence
+            for i in range(tree_view.model().rowCount(tree_view.rootIndex())):
+                index = tree_view.model().index(i, 0, tree_view.rootIndex())
+                item_text = tree_view.model().data(index)
+                
+                # Masquer ou afficher l'élément selon le filtre
+                if regex.search(item_text):
+                    tree_view.setRowHidden(i, tree_view.rootIndex(), False)
+                else:
+                    tree_view.setRowHidden(i, tree_view.rootIndex(), True)
+        except re.error:
+            # En cas d'erreur dans l'expression régulière, ne pas filtrer
+            pass
+    
+    def delete_item(self, path):
+        """Suppression d'un élément
         
         Args:
             path (str): Chemin de l'élément à supprimer
         """
-        item_name = os.path.basename(path)
-        is_dir = os.path.isdir(path)
-        item_type = "dossier" if is_dir else "fichier"
-        parent_dir = os.path.dirname(path)
+        if not os.path.exists(path):
+            return
+            
+        # Confirmation de la suppression
+        msg = "Voulez-vous vraiment supprimer cet élément ?\n\n" + path
+        reply = QMessageBox.question(self, "Confirmation", msg, QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
         
-        confirm = self.show_question(
-            "Confirmation",
-            f"Voulez-vous vraiment supprimer {item_type} '{item_name}' ?"
-        )
-        
-        if confirm:
-            success = self.file_service.delete_item(path)
+        if reply == QMessageBox.Yes:
+            success = False
+            try:
+                if os.path.isdir(path):
+                    import shutil
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
+                success = True
+            except Exception as e:
+                self.show_error("Erreur", f"Impossible de supprimer l'élément: {e}")
             
             if success:
-                self.statusBar.showMessage(f"{item_type.capitalize()} supprimé: {path}")
+                self.statusBar.showMessage(f"Elément supprimé: {path}")
                 # Rafraîchir l'arborescence
+                parent_dir = os.path.dirname(path)
                 self.file_tree_right.set_root_path(parent_dir)
             else:
                 self.show_error("Erreur", f"Impossible de supprimer l'élément: {path}")

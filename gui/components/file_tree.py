@@ -5,11 +5,14 @@
 Composant d'arborescence de fichiers pour l'application
 """
 
+import os
+
 from PyQt5.QtWidgets import (
     QTreeView, QFileSystemModel, QMenu, QHeaderView,
-    QAbstractItemView
+    QAbstractItemView, QApplication
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QDir
+from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QDir, QMimeData
+from PyQt5.QtGui import QDrag
 
 class FileTree(QTreeView):
     """Composant d'arborescence de fichiers basé sur QTreeView et QFileSystemModel"""
@@ -18,6 +21,7 @@ class FileTree(QTreeView):
     item_selected = pyqtSignal(str)
     item_double_clicked = pyqtSignal(str)
     context_menu_requested = pyqtSignal(str, bool, object)  # path, is_dir, position
+    files_dropped = pyqtSignal(list, str)  # list of source paths, target path
     
     def __init__(self, parent=None, allow_navigation_up=False):
         """
@@ -42,7 +46,10 @@ class FileTree(QTreeView):
         self.setMinimumWidth(250)
         self.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.setDragDropMode(QAbstractItemView.DragDrop)
-        self.setSelectionMode(QAbstractItemView.SingleSelection)
+        self.setDragEnabled(True)
+        self.setAcceptDrops(True)
+        self.setDropIndicatorShown(True)
+        self.setSelectionMode(QAbstractItemView.ExtendedSelection)  # Permettre la sélection multiple
         self.setAnimated(True)
         self.setSortingEnabled(True)
         
@@ -94,7 +101,30 @@ class FileTree(QTreeView):
         if not indexes:
             return None
         
-        return self.fs_model.filePath(indexes[0])
+        # Filtrer pour n'obtenir que les index de la première colonne (nom du fichier)
+        first_column_indexes = [idx for idx in indexes if idx.column() == 0]
+        if not first_column_indexes:
+            return None
+            
+        return self.fs_model.filePath(first_column_indexes[0])
+        
+    def get_selected_paths(self):
+        """
+        Récupération des chemins de tous les éléments sélectionnés
+        
+        Returns:
+            list: Liste des chemins des éléments sélectionnés
+        """
+        indexes = self.selectedIndexes()
+        if not indexes:
+            return []
+            
+        # Filtrer pour n'obtenir que les index de la première colonne (nom du fichier)
+        first_column_indexes = [idx for idx in indexes if idx.column() == 0]
+        if not first_column_indexes:
+            return []
+            
+        return [self.fs_model.filePath(idx) for idx in first_column_indexes]
     
     def is_selected_dir(self):
         """
@@ -162,3 +192,53 @@ class FileTree(QTreeView):
         self.setCurrentIndex(index)
         self.scrollTo(index)
         return True
+        
+    def dragEnterEvent(self, event):
+        """
+        Gestion de l'entrée d'un drag dans la vue
+        
+        Args:
+            event (QDragEnterEvent): Événement d'entrée de drag
+        """
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragEnterEvent(event)
+    
+    def dragMoveEvent(self, event):
+        """
+        Gestion du déplacement d'un drag dans la vue
+        
+        Args:
+            event (QDragMoveEvent): Événement de déplacement de drag
+        """
+        if event.mimeData().hasUrls():
+            event.acceptProposedAction()
+        else:
+            super().dragMoveEvent(event)
+    
+    def dropEvent(self, event):
+        """
+        Gestion du drop dans la vue
+        
+        Args:
+            event (QDropEvent): Événement de drop
+        """
+        if event.mimeData().hasUrls():
+            # Récupérer le chemin cible (où les fichiers sont déposés)
+            index = self.indexAt(event.pos())
+            target_path = self.fs_model.filePath(index) if index.isValid() else self.fs_model.rootPath()
+            
+            # Si la cible est un fichier, utiliser son dossier parent comme cible
+            if index.isValid() and not self.fs_model.isDir(index):
+                target_path = os.path.dirname(target_path)
+            
+            # Récupérer les chemins sources (fichiers glissés)
+            source_paths = [url.toLocalFile() for url in event.mimeData().urls()]
+            
+            # Émettre le signal avec les chemins sources et le chemin cible
+            self.files_dropped.emit(source_paths, target_path)
+            
+            event.acceptProposedAction()
+        else:
+            super().dropEvent(event)
