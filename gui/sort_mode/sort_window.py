@@ -222,9 +222,16 @@ class SortWindow(BaseWindow):
         
         # Arbre des fichiers du projet
         self.file_tree = QTreeWidget()
-        self.file_tree.setHeaderLabels(FILE_TREE_COLUMNS)
-        self.file_tree.setColumnCount(len(FILE_TREE_COLUMNS))
+        # Définir les en-têtes de colonnes pour correspondre à l'ordre des données
+        self.file_tree.setHeaderLabels(["Nom", "Taille", "Date de modification", "Source"])
+        self.file_tree.setColumnCount(4)
         self.file_tree.itemDoubleClicked.connect(self.on_item_double_clicked)
+        # Ajuster la largeur des colonnes pour une meilleure lisibilité
+        self.file_tree.header().setStretchLastSection(False)
+        self.file_tree.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.file_tree.header().resizeSection(1, 100)  # Taille
+        self.file_tree.header().resizeSection(2, 150)  # Date
+        self.file_tree.header().resizeSection(3, 150)  # Source
         
         # Lecteur audio pour les fichiers WAV
         self.audio_player = AudioPlayer()

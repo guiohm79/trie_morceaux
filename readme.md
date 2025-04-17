@@ -15,15 +15,24 @@ Le projet a été restructuré selon l'architecture proposée dans le cahier des
    - Synchronisation bidirectionnelle des options de filtrage (.bak et ._) avec l'arbre des fichiers
    - Affichage de la source des fichiers dans une colonne dédiée avec infobulles détaillées
    - Sauvegarde des métadonnées dans le dossier de destination avec fusion des informations existantes
+   - Correction des inversions de colonnes dans le tableau des projets
 
-2. **Gestion des métadonnées** :
+2. **Mode Workspace (dossier unique)** :
+   - Amélioration de la navigation avec une arborescence complète du système de fichiers
+   - Possibilité de remonter jusqu'à la racine du PC dans l'arborescence gauche
+   - Optimisation de l'affichage des colonnes dans les arborescences de fichiers
+   - Correction des noms de colonnes pour qu'ils correspondent à leur contenu
+   - Ajustement automatique de la largeur des colonnes pour une meilleure lisibilité
+   - Mise en place d'une disposition horizontale plus intuitive pour les arborescences
+
+3. **Gestion des métadonnées** :
    - Amélioration de la sauvegarde des métadonnées en mode local et centralisé
    - Ajout d'une date de sauvegarde aux métadonnées
    - Correction des problèmes de synchronisation des métadonnées entre les modes
    - Réinitialisation correcte des métadonnées lors du changement de projet
    - Résolution des erreurs lors de l'enregistrement des métadonnées
 
-3. **Interface utilisateur** :
+4. **Interface utilisateur** :
    - Amélioration de la navigation entre les modes Tri et Espace de Travail
    - Sauvegarde du dernier mode utilisé dans les paramètres
    - Préservation de la position et taille de la fenêtre lors du changement de mode
@@ -40,15 +49,51 @@ Le projet a été restructuré selon l'architecture proposée dans le cahier des
    - Correction des erreurs lors de l'appel aux méthodes du service de métadonnées
    - Résolution des problèmes de sauvegarde des métadonnées dans le dossier de destination
 
-2. **Nettoyage de la structure du projet** :
-   - Suppression des fichiers obsolètes de l'ancienne structure
-   - Refactorisation complète selon l'architecture modulaire proposée
+2. **Interface utilisateur** :
+   - Correction des inversions de colonnes dans les tableaux et arborescences
+   - Amélioration de la navigation dans les arborescences de fichiers
+   - Optimisation de l'affichage des colonnes et de leur largeur
+   - Correction des noms de colonnes pour qu'ils correspondent à leur contenu
+   - Mise en place d'une disposition horizontale plus intuitive pour les arborescences
+
+3. **Gestion des threads** :
+   - Ajout d'une méthode `closeEvent` pour gérer proprement la fermeture des fenêtres
+   - Implémentation d'un mécanisme contrôlé d'arrêt des threads
+   - Prévention des erreurs "QThread: Destroyed while thread is still running"
+   - Amélioration de la stabilité générale de l'application
    
-3. **Gestion des fichiers** :
+4. **Gestion des fichiers** :
    - Correction des problèmes de sauvegarde ("0 fichiers copiés")
    - Organisation intelligente des fichiers selon leur type
    - Détection automatique des fichiers de préréglages (.fxp, .fxb)
    - Affichage clair des sources de fichiers dans l'interface
+
+### Améliorations Futures
+
+1. **Interface utilisateur** :
+   - Ajout de raccourcis clavier pour les actions fréquentes
+   - Implémentation d'un thème personnalisable (au-delà du mode sombre)
+   - Amélioration de la réactivité de l'interface lors du scan de grands dossiers
+   - Ajout d'une barre de progression plus détaillée pour les opérations longues
+
+2. **Gestion des métadonnées** :
+   - Implémentation de l'auto-complétion pour les tags
+   - Ajout d'un système de tags prédéfinis
+   - Possibilité de rechercher et filtrer par tags
+   - Synchronisation des métadonnées entre différents ordinateurs
+
+3. **Intégration avec Cubase** :
+   - Amélioration de la détection automatique de l'installation de Cubase
+   - Support des versions récentes de Cubase (12 et supérieur)
+   - Lister les plugins et VSTi utilisés
+   - Intégration plus poussée avec l'API de Cubase si disponible
+   - Extraction des informations de tempo et tonalité des projets
+
+4. **Gestion des erreurs** :
+   - Implémentation d'un système de journalisation plus complet
+   - Ajout d'un mécanisme de récupération après erreur
+   - Amélioration des messages d'erreur pour l'utilisateur
+   - Création d'un assistant de dépannage pour les problèmes courants
 
 4. **Gestion des threads et stabilité** :
    - Résolution de l'erreur "QThread: Destroyed while thread is still running"

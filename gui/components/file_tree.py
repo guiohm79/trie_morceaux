@@ -9,7 +9,7 @@ from PyQt5.QtWidgets import (
     QTreeView, QFileSystemModel, QMenu, QHeaderView,
     QAbstractItemView
 )
-from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex
+from PyQt5.QtCore import Qt, pyqtSignal, QModelIndex, QDir
 
 class FileTree(QTreeView):
     """Composant d'arborescence de fichiers basé sur QTreeView et QFileSystemModel"""
@@ -19,14 +19,18 @@ class FileTree(QTreeView):
     item_double_clicked = pyqtSignal(str)
     context_menu_requested = pyqtSignal(str, bool, object)  # path, is_dir, position
     
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, allow_navigation_up=False):
         """
         Initialisation de l'arborescence de fichiers
         
         Args:
             parent (QWidget): Widget parent
+            allow_navigation_up (bool): Autoriser la navigation vers les dossiers parents
         """
         super(FileTree, self).__init__(parent)
+        
+        # Stocker l'option de navigation
+        self.allow_navigation_up = allow_navigation_up
         
         # Création du modèle de système de fichiers
         self.fs_model = QFileSystemModel()
@@ -68,6 +72,16 @@ class FileTree(QTreeView):
         
         # Définir l'index racine dans la vue
         self.setRootIndex(self.fs_model.index(path))
+        
+        # Configurer la possibilité de remonter dans l'arborescence
+        if self.allow_navigation_up:
+            # Autoriser la navigation vers les dossiers parents
+            self.setRootIsDecorated(True)
+            # Ne pas masquer les dossiers parents dans le modèle
+            self.fs_model.setFilter(self.fs_model.filter() & ~QDir.NoDotAndDotDot)
+        else:
+            # Masquer les dossiers parents (..) dans le modèle
+            self.fs_model.setFilter(self.fs_model.filter() | QDir.NoDotAndDotDot)
     
     def get_selected_path(self):
         """

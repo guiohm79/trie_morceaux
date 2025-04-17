@@ -13,7 +13,8 @@ from PyQt5.QtWidgets import (
     QPushButton, QLabel, QFileDialog,
     QGroupBox, QCheckBox, QMessageBox, QProgressBar,
     QSplitter, QTreeWidget, QTreeWidgetItem, QHeaderView,
-    QComboBox, QAction, QLineEdit, QMenu, QTextEdit, QTabWidget
+    QComboBox, QAction, QLineEdit, QMenu, QTextEdit, QTabWidget,
+    QInputDialog
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QSize
 from PyQt5.QtGui import QIcon
@@ -51,6 +52,9 @@ class WorkspaceWindow(BaseWindow):
         self.workspace_dir = settings.last_workspace
         self.all_projects_data = []
         
+        # Thread de scan
+        self.scan_thread = None
+        
         # Configuration de l'interface
         self.setup_ui()
         
@@ -60,6 +64,33 @@ class WorkspaceWindow(BaseWindow):
         # Chargement du workspace s'il existe
         if self.workspace_dir and os.path.exists(self.workspace_dir):
             self.setup_workspace_view(self.workspace_dir)
+    
+    def closeEvent(self, event):
+        """Gestion de la fermeture de la fenêtre
+        
+        Args:
+            event (QCloseEvent): Événement de fermeture
+        """
+        print("closeEvent appelé - Début de la fermeture de la fenêtre")
+        
+        # Arrêt du thread de scan s'il est en cours d'exécution
+        if hasattr(self, 'scan_thread') and self.scan_thread is not None:
+            print(f"Thread de scan existant: {self.scan_thread}, en cours d'exécution: {self.scan_thread.isRunning()}")
+            if self.scan_thread.isRunning():
+                print("Arrêt du thread de scan...")
+                self.scan_thread.stop()
+                self.scan_thread.wait(2000)  # Attendre 2 secondes maximum
+                print("Thread de scan arrêté")
+        else:
+            print("Aucun thread de scan à arrêter")
+        
+        # S'assurer que tous les threads sont arrêtés avant de fermer
+        print("Attente de la fin de tous les threads...")
+        QThread.msleep(500)  # Pause pour laisser le temps aux threads de se terminer
+        
+        # Accepter l'événement de fermeture
+        print("closeEvent terminé - Fermeture de la fenêtre acceptée")
+        event.accept()
     
     def setup_specific_toolbar(self):
         """Configuration spécifique de la barre d'outils"""
@@ -134,12 +165,78 @@ class WorkspaceWindow(BaseWindow):
         details_group = QGroupBox("Détails du projet")
         details_layout = QVBoxLayout(details_group)
         
-        # Arborescences de fichiers
-        self.file_tree_left = FileTree()
+        # Arborescences de fichiers avec étiquettes descriptives
+        # Conteneur principal pour les deux arborescences
+        trees_container = QWidget()
+        trees_layout = QVBoxLayout(trees_container)
+        
+        # Étiquette pour les arborescences
+        trees_label = QLabel("<b>Navigation des fichiers</b>")
+        trees_layout.addWidget(trees_label)
+        
+        # Splitter horizontal pour les deux arborescences
+        trees_splitter = QSplitter(Qt.Vertical)  # Vertical pour avoir les arbres l'un au-dessus de l'autre
+        
+        # Conteneur pour l'arborescence gauche (navigation globale)
+        left_tree_container = QWidget()
+        left_tree_layout = QVBoxLayout(left_tree_container)
+        left_tree_layout.setContentsMargins(0, 0, 0, 0)
+        left_tree_label = QLabel("<b>Navigation globale</b> - Dossier de travail complet")
+        # Création de l'arborescence gauche avec la possibilité de remonter dans l'arborescence
+        self.file_tree_left = FileTree(allow_navigation_up=True)
         self.file_tree_left.context_menu_requested.connect(self.show_file_tree_left_context_menu)
         
+        # Optimisation de l'affichage des colonnes pour l'arborescence gauche
+        self.file_tree_left.header().setStretchLastSection(False)
+        self.file_tree_left.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        # Renommer les colonnes en utilisant le modèle existant avec les noms corrects
+        # Dans QFileSystemModel, l'ordre des colonnes est : Nom (0), Taille (1), Type (2), Date de modification (3)
+        self.file_tree_left.fs_model.setHeaderData(0, Qt.Horizontal, "Nom")
+        self.file_tree_left.fs_model.setHeaderData(1, Qt.Horizontal, "Taille")
+        self.file_tree_left.fs_model.setHeaderData(2, Qt.Horizontal, "Type")
+        self.file_tree_left.fs_model.setHeaderData(3, Qt.Horizontal, "Date de modification")
+        
+        # Ajuster la largeur des colonnes pour une meilleure lisibilité
+        self.file_tree_left.header().resizeSection(1, 100)  # Taille
+        self.file_tree_left.header().resizeSection(2, 100)  # Type
+        self.file_tree_left.header().resizeSection(3, 150)  # Date
+        
+        left_tree_layout.addWidget(left_tree_label)
+        left_tree_layout.addWidget(self.file_tree_left)
+        
+        # Conteneur pour l'arborescence droite (détails du projet)
+        right_tree_container = QWidget()
+        right_tree_layout = QVBoxLayout(right_tree_container)
+        right_tree_layout.setContentsMargins(0, 0, 0, 0)
+        right_tree_label = QLabel("<b>Détails du projet</b> - Contenu du projet sélectionné")
         self.file_tree_right = FileTree()
         self.file_tree_right.context_menu_requested.connect(self.show_file_tree_right_context_menu)
+        
+        # Optimisation de l'affichage des colonnes pour l'arborescence droite
+        self.file_tree_right.header().setStretchLastSection(False)
+        self.file_tree_right.header().setSectionResizeMode(0, QHeaderView.Stretch)
+        # Renommer les colonnes en utilisant le modèle existant avec les noms corrects
+        # Dans QFileSystemModel, l'ordre des colonnes est : Nom (0), Taille (1), Type (2), Date de modification (3)
+        self.file_tree_right.fs_model.setHeaderData(0, Qt.Horizontal, "Nom")
+        self.file_tree_right.fs_model.setHeaderData(1, Qt.Horizontal, "Taille")
+        self.file_tree_right.fs_model.setHeaderData(2, Qt.Horizontal, "Type")
+        self.file_tree_right.fs_model.setHeaderData(3, Qt.Horizontal, "Date de modification")
+        
+        # Ajuster la largeur des colonnes pour une meilleure lisibilité
+        self.file_tree_right.header().resizeSection(1, 100)  # Taille
+        self.file_tree_right.header().resizeSection(2, 100)  # Type
+        self.file_tree_right.header().resizeSection(3, 150)  # Date
+        
+        right_tree_layout.addWidget(right_tree_label)
+        right_tree_layout.addWidget(self.file_tree_right)
+        
+        # Ajout des conteneurs au splitter
+        trees_splitter.addWidget(left_tree_container)
+        trees_splitter.addWidget(right_tree_container)
+        trees_splitter.setSizes([300, 300])  # Tailles initiales égales
+        
+        # Ajout du splitter au conteneur principal
+        trees_layout.addWidget(trees_splitter)
         
         # Onglets pour les différentes vues
         self.details_tabs = QTabWidget()
@@ -171,14 +268,12 @@ class WorkspaceWindow(BaseWindow):
         self.details_tabs.addTab(files_tab, "Lecteur Audio")
         self.details_tabs.addTab(metadata_tab, "Tags & Notes")
         
-        # Ajout du splitter horizontal : à gauche file_tree_left, au centre file_tree_right, à droite les tabs de détails
+        # Ajout du splitter horizontal : à gauche les arborescences, à droite les tabs de détails
         self.details_splitter = QSplitter(Qt.Horizontal)
-        self.details_splitter.addWidget(self.file_tree_left)
-        self.details_splitter.addWidget(self.file_tree_right)
+        self.details_splitter.addWidget(trees_container)
         self.details_splitter.addWidget(self.details_tabs)
-        self.details_splitter.setStretchFactor(0, 1)
+        self.details_splitter.setStretchFactor(0, 2)  # Donner plus d'espace aux arborescences
         self.details_splitter.setStretchFactor(1, 1)
-        self.details_splitter.setStretchFactor(2, 2)
         
         details_layout.addWidget(self.details_splitter)
         
@@ -216,12 +311,60 @@ class WorkspaceWindow(BaseWindow):
         Args:
             directory (str): Chemin du dossier de travail
         """
-        # Définition des racines des arborescences
-        self.file_tree_left.set_root_path(directory)
+        # Pour l'arborescence gauche, on affiche tout le système de fichiers
+        # en utilisant une chaîne vide comme racine pour voir tous les lecteurs
+        self.file_tree_left.set_root_path("")
+        # Présélectionner le dossier de travail pour faciliter la navigation
+        self.file_tree_left.setCurrentIndex(self.file_tree_left.fs_model.index(directory))
+        self.file_tree_left.scrollTo(self.file_tree_left.fs_model.index(directory))
+        self.file_tree_left.expand(self.file_tree_left.fs_model.index(directory))
         
         # Scan du dossier pour trouver les projets
         self.scanner.clear()
         self.scanner.scan_directory(directory)
+        
+        # S'assurer que tous les projets ont un chemin de dossier valide
+        for project_name, project_data in self.scanner.projects.items():
+            # Vérifier si le chemin du projet est déjà défini et valide
+            project_dir = project_data.get('project_dir', '')
+            if not project_dir or not os.path.exists(project_dir):
+                # Stratégie 1: Utiliser le dossier du premier fichier CPR
+                if project_data.get('cpr_files') and len(project_data['cpr_files']) > 0:
+                    first_cpr = project_data['cpr_files'][0]
+                    project_dir = os.path.dirname(first_cpr['path'])
+                    project_data['project_dir'] = project_dir
+                    print(f"Chemin du projet '{project_name}' défini à partir du fichier CPR: {project_dir}")
+                # Stratégie 2: Utiliser le dossier du premier fichier WAV
+                elif project_data.get('wav_files') and len(project_data['wav_files']) > 0:
+                    first_wav = project_data['wav_files'][0]
+                    project_dir = os.path.dirname(first_wav['path'])
+                    project_data['project_dir'] = project_dir
+                    print(f"Chemin du projet '{project_name}' défini à partir du fichier WAV: {project_dir}")
+                # Stratégie 3: Utiliser le dossier du premier fichier BAK
+                elif project_data.get('bak_files') and len(project_data['bak_files']) > 0:
+                    first_bak = project_data['bak_files'][0]
+                    project_dir = os.path.dirname(first_bak['path'])
+                    project_data['project_dir'] = project_dir
+                    print(f"Chemin du projet '{project_name}' défini à partir du fichier BAK: {project_dir}")
+                # Stratégie 4: Utiliser le dossier du premier fichier quelconque
+                elif project_data.get('other_files') and len(project_data['other_files']) > 0:
+                    first_other = project_data['other_files'][0]
+                    project_dir = os.path.dirname(first_other['path'])
+                    project_data['project_dir'] = project_dir
+                    print(f"Chemin du projet '{project_name}' défini à partir d'un autre fichier: {project_dir}")
+                # Stratégie 5: Utiliser le chemin complet du projet dans le workspace
+                else:
+                    project_dir = os.path.join(directory, project_name)
+                    if os.path.exists(project_dir) and os.path.isdir(project_dir):
+                        project_data['project_dir'] = project_dir
+                        print(f"Chemin du projet '{project_name}' défini à partir du dossier: {project_dir}")
+                    else:
+                        # Dernier recours: utiliser le dossier racine
+                        project_data['project_dir'] = directory
+                        print(f"Chemin du projet '{project_name}' défini à partir du dossier racine: {directory}")
+        
+        # Recréer le DataFrame après avoir mis à jour les chemins des projets
+        self.scanner._create_dataframe()
         
         # Mise à jour de la table des projets
         self.all_projects_data = self.scanner.df_projects
@@ -305,13 +448,21 @@ class WorkspaceWindow(BaseWindow):
         if project_folder and os.path.exists(project_folder):
             self.file_tree_right.set_root_path(project_folder)
         
+        # Réinitialiser les métadonnées avant de les mettre à jour
+        # Cela évite que les métadonnées d'un projet précédent ne persistent
+        self.metadata_editor.set_metadata({'tags': [], 'rating': 0, 'notes': ''})
+        
         # Récupération des métadonnées du projet
         try:
             metadata = self.metadata_service.get_project_metadata(project_name, project_folder)
-            self.metadata_editor.set_metadata(metadata)
+            if metadata:
+                # Mise à jour des métadonnées dans l'éditeur
+                self.metadata_editor.set_metadata(metadata)
+                print(f"Métadonnées chargées pour {project_name} depuis {project_folder}")
+            else:
+                print(f"Aucune métadonnée trouvée pour {project_name}")
         except Exception as e:
             print(f"Erreur lors de la récupération des métadonnées: {e}")
-            self.metadata_editor.set_metadata({'tags': [], 'rating': 0, 'notes': ''})
         
         # Message de statut
         self.statusBar.showMessage(f"Projet sélectionné: {project_name}")
@@ -536,10 +687,29 @@ class WorkspaceWindow(BaseWindow):
         # Récupération des métadonnées depuis l'éditeur
         metadata = self.metadata_editor.get_metadata()
         
-        # Sauvegarde des métadonnées
         try:
-            self.metadata_service.set_project_metadata(project_name, metadata, project_folder)
-            self.statusBar.showMessage(f"Métadonnées sauvegardées pour {project_name}")
+            # Récupérer les métadonnées existantes du service
+            existing_metadata = self.metadata_service.get_project_metadata(project_name, project_folder)
+            if existing_metadata:
+                # Fusionner les métadonnées existantes avec celles de l'éditeur
+                # pour s'assurer que toutes les informations sont préservées
+                for key, value in existing_metadata.items():
+                    if key not in metadata or not metadata[key]:
+                        metadata[key] = value
+            
+            # Ajouter la date de sauvegarde aux métadonnées
+            metadata['saved_date'] = datetime.datetime.now().isoformat()
+            metadata['name'] = project_name
+            
+            # Sauvegarde des métadonnées
+            success = self.metadata_service.set_project_metadata(project_name, metadata, project_folder)
+            
+            if success:
+                # Afficher uniquement un message dans la barre d'état
+                self.statusBar.showMessage(f"Métadonnées du projet '{project_name}' sauvegardées")
+                print(f"Métadonnées sauvegardées pour {project_name} dans {project_folder}")
+            else:
+                self.show_warning("Erreur", f"Erreur lors de la sauvegarde des métadonnées du projet '{project_name}'")
         except Exception as e:
             print(f"Erreur lors de la sauvegarde des métadonnées: {e}")
             self.statusBar.showMessage(f"Erreur lors de la sauvegarde des métadonnées: {e}")

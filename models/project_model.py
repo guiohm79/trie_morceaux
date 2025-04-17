@@ -25,15 +25,16 @@ class ProjectTableModel(QAbstractTableModel):
         
         # En-têtes et colonnes du tableau
         self._headers = PROJECT_COLUMNS
+        # Ordre des colonnes corrigé pour correspondre aux en-têtes
+        # PROJECT_COLUMNS = ["Nom du projet", "Date de modification", "Taille", "Fichiers CPR", "Fichiers BAK", "Fichiers WAV", "Source"]
         self._columns = [
-            'project_name', 
-            'source', 
-            'latest_cpr_date', 
-            'cpr_count', 
-            'bak_count', 
-            'wav_count', 
-            'total_size_mb',
-            'rating'
+            'project_name',      # Nom du projet
+            'latest_cpr_date',   # Date de modification
+            'total_size_mb',     # Taille
+            'cpr_count',         # Fichiers CPR
+            'bak_count',         # Fichiers BAK
+            'wav_count',         # Fichiers WAV
+            'source'             # Source
         ]
         
         # Couleurs pour différencier les sources

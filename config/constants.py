@@ -38,9 +38,10 @@ PROJECT_COLUMNS = [
 ]
 
 # Colonnes de l'arborescence des fichiers
+# Ordre des colonnes dans QFileSystemModel : Nom, Taille, Type, Date de modification
 FILE_TREE_COLUMNS = [
-    "Fichier",
+    "Nom",
     "Taille",
-    "Date de modification",
-    "Source"
+    "Type",
+    "Date de modification"
 ]
