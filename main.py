@@ -14,13 +14,16 @@ from gui.workspace_mode.workspace_window import WorkspaceWindow
 from config.constants import MODE_TRI, MODE_WORKSPACE, UI_WINDOW_TITLE
 from config.settings import settings
 
+# Référence globale à la fenêtre active pour éviter qu'elle ne soit collectée par le garbage collector
+active_window = None
+
 def parse_arguments():
     """Analyse des arguments de la ligne de commande"""
     parser = argparse.ArgumentParser(description="Application de gestion de projets Cubase")
     parser.add_argument(
         "--mode", 
         choices=[MODE_TRI, MODE_WORKSPACE], 
-        default=MODE_WORKSPACE,
+        default=None,
         help="Mode de fonctionnement de l'application (tri ou workspace)"
     )
     return parser.parse_args()
@@ -34,11 +37,25 @@ def main():
     app = QApplication(sys.argv)
     app.setApplicationName(UI_WINDOW_TITLE)
     
+    # Chargement des préférences
+    settings.load()
+    
+    # Déterminer le mode à utiliser (priorité aux arguments de ligne de commande)
+    mode = args.mode if args.mode else settings.last_mode
+    
+    # Sauvegarder le mode actuel
+    settings.last_mode = mode
+    settings.save()
+    
     # Création de la fenêtre selon le mode
-    if args.mode == MODE_TRI:
+    if mode == MODE_TRI:
         window = SortWindow()
     else:  # MODE_WORKSPACE par défaut
         window = WorkspaceWindow()
+    
+    # Conserver une référence globale à la fenêtre active
+    global active_window
+    active_window = window
     
     # Affichage de la fenêtre
     window.show()

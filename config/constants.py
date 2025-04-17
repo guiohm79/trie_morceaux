@@ -41,5 +41,6 @@ PROJECT_COLUMNS = [
 FILE_TREE_COLUMNS = [
     "Fichier",
     "Taille",
-    "Date de modification"
+    "Date de modification",
+    "Source"
 ]

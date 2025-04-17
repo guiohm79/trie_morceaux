@@ -21,6 +21,7 @@ class Settings:
         self.last_notes = ""
         self.cubase_path = ""
         self.last_workspace = ""
+        self.last_mode = "workspace"  # Mode par défaut (workspace ou tri)
         self.prefs_dir = Path(os.path.expanduser(DEFAULT_PREFS_DIR))
         self.prefs_file = self.prefs_dir / DEFAULT_PREFS_FILE
     
@@ -36,7 +37,8 @@ class Settings:
             'last_rename': self.last_rename,
             'last_notes': self.last_notes,
             'cubase_path': self.cubase_path,
-            'last_workspace': self.last_workspace
+            'last_workspace': self.last_workspace,
+            'last_mode': self.last_mode
         }
         
         # Sauvegarde dans le fichier JSON
@@ -59,6 +61,7 @@ class Settings:
             self.last_notes = prefs.get('last_notes', "")
             self.cubase_path = prefs.get('cubase_path', "")
             self.last_workspace = prefs.get('last_workspace', "")
+            self.last_mode = prefs.get('last_mode', "workspace")
         except Exception as e:
             print(f"Erreur lors du chargement des préférences: {e}")
     

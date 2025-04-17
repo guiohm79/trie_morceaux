@@ -6,16 +6,60 @@ Application de gestion de projets Cubase permettant de trier, comparer, sauvegar
 
 Le projet a été restructuré selon l'architecture proposée dans le cahier des charges. Les deux modes de fonctionnement (Tri et Espace de Travail) sont maintenant clairement séparés et utilisent des composants communs réutilisables.
 
+### Améliorations Récentes
+
+1. **Mode Tri (multi-sources)** :
+   - Implémentation d'une structure de dossiers standard Cubase lors de la sauvegarde des projets
+   - Création automatique des dossiers Audio, Auto Saves, Edits, Images et Presets
+   - Sélection intelligente des fichiers avec mise en évidence des fichiers les plus récents
+   - Synchronisation bidirectionnelle des options de filtrage (.bak et ._) avec l'arbre des fichiers
+   - Affichage de la source des fichiers dans une colonne dédiée avec infobulles détaillées
+   - Sauvegarde des métadonnées dans le dossier de destination avec fusion des informations existantes
+
+2. **Gestion des métadonnées** :
+   - Amélioration de la sauvegarde des métadonnées en mode local et centralisé
+   - Ajout d'une date de sauvegarde aux métadonnées
+   - Correction des problèmes de synchronisation des métadonnées entre les modes
+   - Réinitialisation correcte des métadonnées lors du changement de projet
+   - Résolution des erreurs lors de l'enregistrement des métadonnées
+
+3. **Interface utilisateur** :
+   - Amélioration de la navigation entre les modes Tri et Espace de Travail
+   - Sauvegarde du dernier mode utilisé dans les paramètres
+   - Préservation de la position et taille de la fenêtre lors du changement de mode
+   - Simplification du comportement des cases à cocher (suppression de l'état intermédiaire)
+   - Correction des problèmes de fenêtres qui s'ouvrent en double
+   - Élimination des messages de confirmation redondants
+
 ### Problèmes Résolus
 
 1. **Gestion des métadonnées en mode local** : 
    - Ajout du champ `project_dir` dans le scanner pour stocker correctement le chemin du dossier de chaque projet
    - Amélioration de la gestion des erreurs dans le service de métadonnées
    - Meilleure résilience face aux chemins manquants ou invalides
+   - Correction des erreurs lors de l'appel aux méthodes du service de métadonnées
+   - Résolution des problèmes de sauvegarde des métadonnées dans le dossier de destination
 
 2. **Nettoyage de la structure du projet** :
    - Suppression des fichiers obsolètes de l'ancienne structure
    - Refactorisation complète selon l'architecture modulaire proposée
+   
+3. **Gestion des fichiers** :
+   - Correction des problèmes de sauvegarde ("0 fichiers copiés")
+   - Organisation intelligente des fichiers selon leur type
+   - Détection automatique des fichiers de préréglages (.fxp, .fxb)
+   - Affichage clair des sources de fichiers dans l'interface
+
+4. **Gestion des threads et stabilité** :
+   - Résolution de l'erreur "QThread: Destroyed while thread is still running"
+   - Implémentation d'un mécanisme d'arrêt contrôlé des threads
+   - Nettoyage des threads après utilisation pour éviter les fuites de mémoire
+
+5. **Interface utilisateur** :
+   - Correction du problème des fenêtres de sélection qui s'ouvrent en double
+   - Simplification du comportement des cases à cocher dans l'arbre des fichiers
+   - Élimination des messages de confirmation redondants
+   - Amélioration de la réactivité lors du changement de projet
 
 ### Structure Implémentée
 
@@ -68,15 +112,13 @@ L'application peut être lancée dans deux modes :
 
 ### 1. Améliorations Techniques
 
-1. **Tests unitaires** :
-   - Implémenter des tests unitaires pour les services et composants principaux
-   - Mettre en place une intégration continue pour exécuter les tests automatiquement
-
-2. **Gestion des exceptions** :
-   - Améliorer la gestion des exceptions dans tous les services
+1. **Gestion des erreurs** :
+   - Améliorer la détection et la récupération après erreur
+   - Ajouter des messages d'erreur plus descriptifs
+   - ✅ Améliorer la gestion des exceptions dans tous les services
    - Implémenter un système de journalisation (logging) centralisé
 
-3. **Optimisation des performances** :
+2. **Optimisation des performances** :
    - Optimiser le scan des dossiers volumineux avec un threading plus avancé
    - Implémenter un système de mise en cache des métadonnées
 
@@ -86,16 +128,23 @@ L'application peut être lancée dans deux modes :
    - Ajouter des raccourcis clavier pour les actions fréquentes
    - Améliorer l'expérience utilisateur avec des animations et transitions
    - Implémenter un système de thèmes plus complet
+   - Ajouter une fonction de recherche de projets par mots-clés ou tags
+   - ✅ Simplifier le comportement des cases à cocher dans l'interface
+   - ✅ Améliorer l'affichage des sources de fichiers
 
 2. **Gestion des métadonnées** :
    - Implémenter un système de tags hiérarchiques
    - Ajouter la possibilité d'importer/exporter les métadonnées
    - Synchronisation avec des services cloud
+   - Améliorer l'interface d'édition des métadonnées avec auto-complétion des tags
+   - ✅ Résoudre les problèmes de sauvegarde et de mise à jour des métadonnées
 
 3. **Fonctionnalités avancées** :
    - Intégration plus poussée avec l'API de Cubase
    - Analyse audio avancée (détection de BPM, tonalité, etc.)
    - Gestion des versions et historique des modifications
+   - Comparaison visuelle des différentes versions d'un projet
+   - Sauvegarde automatique programmée des projets importants
 
 ### 3. Documentation
 

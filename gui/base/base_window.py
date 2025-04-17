@@ -63,6 +63,21 @@ class BaseWindow(QMainWindow):
         self.action_toggle_theme.toggled.connect(self.toggle_theme)
         self.toolbar.addAction(self.action_toggle_theme)
         
+        # Action pour basculer entre les modes
+        self.toolbar.addSeparator()
+        from config.constants import MODE_TRI, MODE_WORKSPACE
+        current_mode = self.__class__.__name__
+        if "SortWindow" in current_mode:
+            self.action_switch_mode = QAction("Passer en mode Espace de Travail", self)
+            self.action_switch_mode.setToolTip("Basculer vers le mode Espace de Travail")
+            self.next_mode = MODE_WORKSPACE
+        else:
+            self.action_switch_mode = QAction("Passer en mode Tri", self)
+            self.action_switch_mode.setToolTip("Basculer vers le mode Tri (multi-sources)")
+            self.next_mode = MODE_TRI
+        self.action_switch_mode.triggered.connect(self.switch_mode)
+        self.toolbar.addAction(self.action_switch_mode)
+        
         # Les classes dérivées peuvent ajouter leurs propres actions
         self.setup_specific_toolbar()
         
@@ -107,6 +122,67 @@ class BaseWindow(QMainWindow):
         
         # Accepter l'événement de fermeture
         event.accept()
+    
+    def switch_mode(self):
+        """Basculer entre les modes Tri et Espace de Travail"""
+        try:
+            print(f"Début du basculement vers le mode {self.next_mode}")
+            
+            # Sauvegarder le mode actuel dans les paramètres
+            settings.last_mode = self.next_mode
+            settings.save()
+            
+            # Informer l'utilisateur du changement de mode
+            self.statusBar.showMessage(f"Basculement vers le mode {self.next_mode}...")
+            
+            # Créer une nouvelle fenêtre du mode approprié
+            from gui.sort_mode.sort_window import SortWindow
+            from gui.workspace_mode.workspace_window import WorkspaceWindow
+            
+            print(f"Classes importées avec succès")
+            
+            # Obtenir la position et la taille actuelles de la fenêtre
+            pos = self.pos()
+            size = self.size()
+            
+            # Créer la nouvelle fenêtre selon le mode
+            print(f"Création de la nouvelle fenêtre pour le mode {self.next_mode}")
+            
+            # Créer une instance de la nouvelle fenêtre sans la fermer immédiatement
+            if self.next_mode == "tri":
+                new_window = SortWindow()
+                print("SortWindow créée avec succès")
+            else:  # MODE_WORKSPACE
+                new_window = WorkspaceWindow()
+                print("WorkspaceWindow créée avec succès")
+            
+            # Conserver une référence globale à la nouvelle fenêtre
+            import main
+            main.active_window = new_window
+            print("Référence globale mise à jour")
+            
+            # Appliquer la position et la taille
+            new_window.move(pos)
+            new_window.resize(size)
+            
+            # Afficher la nouvelle fenêtre
+            print("Affichage de la nouvelle fenêtre")
+            new_window.show()
+            
+            # Attendre un peu avant de fermer l'ancienne fenêtre
+            import time
+            time.sleep(0.5)  # Attendre 500ms
+            
+            # Fermer la fenêtre actuelle
+            print("Fermeture de l'ancienne fenêtre")
+            self.close()
+            
+            print("Basculement terminé avec succès")
+        except Exception as e:
+            import traceback
+            print(f"Erreur lors du basculement de mode: {e}")
+            print(traceback.format_exc())
+            self.show_error("Erreur", f"Impossible de basculer vers le mode {self.next_mode}:\n{str(e)}")
     
     def show_error(self, title, message):
         """Afficher un message d'erreur"""
