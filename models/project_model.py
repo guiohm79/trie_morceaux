@@ -10,9 +10,11 @@ from datetime import datetime
 from PyQt5.QtCore import Qt, QAbstractTableModel, QModelIndex, QVariant
 from PyQt5.QtGui import QColor, QBrush
 
+from config.constants import PROJECT_COLUMNS
+
 class ProjectTableModel(QAbstractTableModel):
     """Modèle de données pour l'affichage des projets dans un tableau"""
-    dark_mode = False  # Ajouté : mode sombre activé ou non
+    dark_mode = False  # Mode sombre activé ou non
     
     def __init__(self, parent=None):
         """Initialisation du modèle"""
@@ -22,16 +24,7 @@ class ProjectTableModel(QAbstractTableModel):
         self._data = []
         
         # En-têtes et colonnes du tableau
-        self._headers = [
-            "Nom du projet", 
-            "Dossier", 
-            "Date", 
-            "Nb CPR", 
-            "Nb BAK", 
-            "Nb WAV", 
-            "Taille (MB)",
-            "Note"
-        ]
+        self._headers = PROJECT_COLUMNS
         self._columns = [
             'project_name', 
             'source', 
@@ -149,13 +142,18 @@ class ProjectTableModel(QAbstractTableModel):
         # Réinitialiser les couleurs des sources
         self._source_to_color = {}
         
-        # Ajout des notes depuis le gestionnaire de métadonnées
-        from utils.metadata_manager import MetadataManager
-        metadata_manager = MetadataManager()
+        # Ajout des notes depuis le service de métadonnées
+        from services.metadata_service import MetadataService
+        metadata_service = MetadataService()
         
         for project in self._data:
             project_name = project['project_name']
-            project['rating'] = metadata_manager.get_project_rating(project_name)
+            try:
+                metadata = metadata_service.get_project_metadata(project_name)
+                project['rating'] = metadata.get('rating', 0)
+            except Exception as e:
+                print(f"Erreur lors de la récupération des métadonnées pour {project_name}: {e}")
+                project['rating'] = 0
         
         # Marquer les projets les plus récents dans chaque dossier
         if self._view_mode == "folder" and self._data:
@@ -177,6 +175,20 @@ class ProjectTableModel(QAbstractTableModel):
         
         self.endResetModel()
     
+    def get_project(self, row):
+        """
+        Récupération du projet à une ligne donnée
+        
+        Args:
+            row (int): Indice de la ligne
+            
+        Returns:
+            dict: Données du projet
+        """
+        if 0 <= row < len(self._data):
+            return self._data[row]
+        return None
+        
     def get_project_at_row(self, row):
         """
         Récupération du nom du projet à une ligne donnée

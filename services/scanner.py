@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Module de scan et d'analyse des projets Cubase
+Service de scan et d'analyse des projets Cubase
 """
 
 import os
@@ -12,7 +12,7 @@ import shutil
 from collections import defaultdict
 
 class CubaseScanner:
-    """Classe pour scanner et analyser les projets Cubase"""
+    """Service pour scanner et analyser les projets Cubase"""
     
     def __init__(self):
         """Initialisation du scanner"""
@@ -22,7 +22,8 @@ class CubaseScanner:
             'wav_files': [],
             'other_files': [],
             'directories': [],
-            'source': ''
+            'source': '',
+            'project_dir': ''  # Ajout du chemin complet du dossier du projet
         })
         self.df_projects = []
     
@@ -56,7 +57,9 @@ class CubaseScanner:
                 # Détermination du nom du projet (nom du dossier parent)
                 project_name = project_dir.name
                 
-                print(f"Fichier trouvé: {path.name}, ext: {ext}, projet: {project_name}")
+                # Initialisation du chemin du dossier du projet s'il n'existe pas encore
+                if 'project_dir' not in self.projects[project_name] or not self.projects[project_name]['project_dir']:
+                    self.projects[project_name]['project_dir'] = str(project_dir)
                 
                 # Si le projet n'a pas encore de source, on l'initialise
                 if 'source' not in self.projects[project_name]:
@@ -74,7 +77,6 @@ class CubaseScanner:
                         'created': datetime.fromtimestamp(path.stat().st_ctime),
                         'source': str(root_path)
                     })
-                    print(f"Ajouté fichier CPR: {path.name} au projet {project_name}")
                 elif ext == '.bak':
                     self.projects[project_name]['bak_files'].append({
                         'path': str(path),
@@ -83,7 +85,6 @@ class CubaseScanner:
                         'created': datetime.fromtimestamp(path.stat().st_ctime),
                         'source': str(root_path)
                     })
-                    print(f"Ajouté fichier BAK: {path.name} au projet {project_name}")
                 elif ext == '.wav':
                     self.projects[project_name]['wav_files'].append({
                         'path': str(path),
@@ -92,7 +93,6 @@ class CubaseScanner:
                         'created': datetime.fromtimestamp(path.stat().st_ctime),
                         'source': str(root_path)
                     })
-                    print(f"Ajouté fichier WAV: {path.name} au projet {project_name}")
                 else:
                     self.projects[project_name]['other_files'].append({
                         'path': str(path),
@@ -155,6 +155,7 @@ class CubaseScanner:
             data.append({
                 'project_name': project_name,
                 'source': project_data.get('source', ''),
+                'project_dir': project_data.get('project_dir', ''),  # Ajout du chemin du dossier du projet
                 'latest_cpr': latest_cpr['path'] if latest_cpr else None,
                 'latest_cpr_date': latest_cpr['modified'] if latest_cpr else None,
                 'cpr_count': len(project_data['cpr_files']),
@@ -200,93 +201,95 @@ class CubaseScanner:
             return False
         
         # Détermination du nom du dossier de destination
-        target_name = new_project_name if new_project_name else project_name
+        dest_project_name = new_project_name if new_project_name else project_name
+        dest_project_dir = Path(destination) / dest_project_name
         
-        # Création du dossier de destination principal
-        dest_dir = Path(destination) / target_name
-        dest_dir.mkdir(parents=True, exist_ok=True)
+        # Création du dossier de destination
+        try:
+            dest_project_dir.mkdir(parents=True, exist_ok=True)
+        except Exception as e:
+            print(f"Erreur lors de la création du dossier de destination: {e}")
+            return False
         
-        print(f"Sauvegarde du projet '{project_name}' vers '{dest_dir}'")
-        
-        # Copie du fichier CPR le plus récent
-        if project['cpr_files']:
-            latest_cpr = max(project['cpr_files'], key=lambda x: x['modified'])
-            cpr_path = Path(latest_cpr['path'])
+        # Copie des fichiers CPR
+        for file_info in project['cpr_files']:
+            src_path = Path(file_info['path'])
+            dest_path = dest_project_dir / src_path.name
             
-            # Vérifier si le fichier commence par ._ et si l'option est activée
-            if remove_dotunderscore and cpr_path.name.startswith('._'):
-                print(f"Ignoré fichier CPR commençant par ._: {cpr_path}")
-            else:
-                shutil.copy2(latest_cpr['path'], dest_dir)
-                print(f"Copié fichier CPR: {latest_cpr['path']} vers {dest_dir}")
+            try:
+                shutil.copy2(src_path, dest_path)
+                print(f"Copié: {src_path} -> {dest_path}")
+            except Exception as e:
+                print(f"Erreur lors de la copie du fichier CPR: {e}")
         
         # Copie des fichiers BAK si demandé
-        if keep_bak and project['bak_files']:
-            # Création du dossier Auto Saves
-            auto_saves_dir = dest_dir / 'Auto Saves'
-            auto_saves_dir.mkdir(exist_ok=True)
-            
-            for bak_file in project['bak_files']:
-                bak_path = Path(bak_file['path'])
+        if keep_bak:
+            for file_info in project['bak_files']:
+                src_path = Path(file_info['path'])
+                dest_path = dest_project_dir / src_path.name
                 
-                # Vérifier si le fichier commence par ._ et si l'option est activée
-                if remove_dotunderscore and bak_path.name.startswith('._'):
-                    print(f"Ignoré fichier BAK commençant par ._: {bak_path}")
-                else:
-                    shutil.copy2(bak_file['path'], auto_saves_dir)
-                    print(f"Copié fichier BAK: {bak_file['path']} vers {auto_saves_dir}")
+                try:
+                    shutil.copy2(src_path, dest_path)
+                    print(f"Copié: {src_path} -> {dest_path}")
+                except Exception as e:
+                    print(f"Erreur lors de la copie du fichier BAK: {e}")
         
-        # Création du dossier Audio si nécessaire
-        audio_dir = dest_dir / 'Audio'
-        audio_dir.mkdir(exist_ok=True)
-        
-        # Copie des fichiers WAV avec distinction entre aperçus et samples
-        for wav_file in project['wav_files']:
-            wav_path = Path(wav_file['path'])
-            wav_name = wav_path.name.lower()
+        # Copie des fichiers WAV
+        for file_info in project['wav_files']:
+            src_path = Path(file_info['path'])
             
-            # Vérifier si c'est un aperçu du projet (nom proche du projet)
-            # On considère que c'est un aperçu si le nom du projet est contenu dans le nom du fichier WAV
-            is_preview = project_name.lower() in wav_name
+            # Vérification si le fichier doit être ignoré
+            if remove_dotunderscore and src_path.name.startswith('._'):
+                print(f"Ignoré (._): {src_path}")
+                continue
             
-            # Destination du fichier WAV
-            if is_preview:
-                # Les aperçus vont directement dans le dossier Audio
-                target_dir = audio_dir
-            else:
-                # Les samples vont dans un sous-dossier Samples du dossier Audio
-                samples_dir = audio_dir / 'Samples'
-                samples_dir.mkdir(exist_ok=True)
-                target_dir = samples_dir
+            dest_path = dest_project_dir / src_path.name
             
-            # Vérifier si le fichier commence par ._ et si l'option est activée
-            if remove_dotunderscore and wav_path.name.startswith('._'):
-                preview_text = "(aperçu)" if is_preview else "(sample)"
-                print(f"Ignoré fichier WAV {preview_text} commençant par ._: {wav_path}")
-            else:
-                # Copie du fichier WAV
-                shutil.copy2(wav_file['path'], target_dir)
-                preview_text = "(aperçu)" if is_preview else "(sample)"
-                print(f"Copié fichier WAV {preview_text}: {wav_file['path']} vers {target_dir}")
-        
-        # Création des autres dossiers standard de Cubase s'ils n'existent pas déjà
-        for folder in ['Edits', 'Images', 'Track Pictures']:
-            folder_path = dest_dir / folder
-            folder_path.mkdir(exist_ok=True)
-        
-        # Création du fichier notes.txt si des notes sont fournies
-        if project_notes:
-            notes_file = dest_dir / 'notes.txt'
             try:
-                # Ajout de la date et heure actuelle en en-tête
-                from datetime import datetime
-                header = f"Notes pour le projet '{project_name}' - {datetime.now().strftime('%d/%m/%Y %H:%M')}\n"
-                header += "-" * 80 + "\n\n"
-                
-                with open(notes_file, 'w', encoding='utf-8') as f:
-                    f.write(header + project_notes)
-                print(f"Fichier de notes créé: {notes_file}")
+                shutil.copy2(src_path, dest_path)
+                print(f"Copié: {src_path} -> {dest_path}")
+            except Exception as e:
+                print(f"Erreur lors de la copie du fichier WAV: {e}")
+        
+        # Copie des autres fichiers
+        for file_info in project['other_files']:
+            src_path = Path(file_info['path'])
+            
+            # Vérification si le fichier doit être ignoré
+            if remove_dotunderscore and src_path.name.startswith('._'):
+                print(f"Ignoré (._): {src_path}")
+                continue
+            
+            dest_path = dest_project_dir / src_path.name
+            
+            try:
+                shutil.copy2(src_path, dest_path)
+                print(f"Copié: {src_path} -> {dest_path}")
+            except Exception as e:
+                print(f"Erreur lors de la copie du fichier: {e}")
+        
+        # Création du fichier de notes si des notes sont fournies
+        if project_notes:
+            notes_path = dest_project_dir / "notes.txt"
+            try:
+                with open(notes_path, 'w', encoding='utf-8') as f:
+                    f.write(project_notes)
+                print(f"Notes sauvegardées dans: {notes_path}")
             except Exception as e:
                 print(f"Erreur lors de la création du fichier de notes: {e}")
         
         return True
+    
+    def clear(self):
+        """
+        Réinitialisation du scanner
+        """
+        self.projects = defaultdict(lambda: {
+            'cpr_files': [],
+            'bak_files': [],
+            'wav_files': [],
+            'other_files': [],
+            'directories': [],
+            'source': ''
+        })
+        self.df_projects = []

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 """
-Module de lecture audio pour les fichiers WAV
+Composant de lecteur audio unifié pour les fichiers WAV
 """
 
 from PyQt5.QtCore import QUrl, pyqtSignal, pyqtSlot, QTimer
@@ -15,7 +15,7 @@ from PyQt5.QtCore import Qt
 from pathlib import Path
 
 class AudioPlayer(QWidget):
-    """Lecteur audio simple pour les fichiers WAV"""
+    """Lecteur audio unifié pour les fichiers WAV"""
     
     # Signal émis lorsque la lecture est terminée
     playback_finished = pyqtSignal()
@@ -208,12 +208,20 @@ class AudioPlayer(QWidget):
         Définition de la position de lecture
         
         Args:
-            position (int): Nouvelle position en millisecondes
+            position (int): Position en millisecondes
         """
         self.player.setPosition(position)
     
-    @pyqtSlot()
     def update_position(self):
         """Mise à jour de la position actuelle"""
         position = self.player.position()
         self.on_position_changed(position)
+    
+    def get_current_file(self):
+        """
+        Récupération du fichier audio actuel
+        
+        Returns:
+            str: Chemin du fichier audio actuel ou None
+        """
+        return self.current_file
