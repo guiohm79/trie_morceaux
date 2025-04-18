@@ -33,6 +33,7 @@ from services.metadata_service import MetadataService
 from services.file_service import FileService
 from services.audio_service import AudioService
 from services.cubase_service import CubaseService
+from services.lectureCPR import trouve_vsti
 
 from config.constants import FILE_TREE_COLUMNS
 from config.settings import settings
@@ -313,12 +314,18 @@ class WorkspaceWindow(BaseWindow):
         # Éditeur de métadonnées
         self.metadata_editor = MetadataEditor()
         self.metadata_editor.save_requested.connect(self.save_project_metadata)
-        
         metadata_layout.addWidget(self.metadata_editor)
-        
+
+        # Zone d'affichage des VSTi
+        self.vsti_text = QTextEdit()
+        self.vsti_text.setReadOnly(True)
+        self.vsti_text.setPlaceholderText("VSTi utilisés : sélectionnez un projet pour voir la liste.")
+        metadata_layout.addWidget(QLabel("<b>VSTi utilisés dans ce projet :</b>"))
+        metadata_layout.addWidget(self.vsti_text)
+
         # Ajout des onglets
         self.details_tabs.addTab(files_tab, "Lecteur Audio")
-        self.details_tabs.addTab(metadata_tab, "Tags & Notes")
+        self.details_tabs.addTab(metadata_tab, "Tags & Notes / VSTi")
         
         # Ajout du splitter horizontal : à gauche les arborescences, à droite les tabs de détails
         self.details_splitter = QSplitter(Qt.Horizontal)
@@ -556,7 +563,29 @@ class WorkspaceWindow(BaseWindow):
                 print(f"Aucune métadonnée trouvée pour {project_name}")
         except Exception as e:
             print(f"Erreur lors de la récupération des métadonnées: {e}")
-        
+
+        # Recherche et affichage des VSTi
+        self.vsti_text.clear()
+        vsti_list = set()
+        # Recherche du CPR principal
+        cpr_path = None
+        if project_folder and os.path.exists(project_folder):
+            for file in os.listdir(project_folder):
+                if file.lower().endswith('.cpr'):
+                    cpr_path = os.path.join(project_folder, file)
+                    break
+        if cpr_path and os.path.exists(cpr_path):
+            try:
+                vsti_list = trouve_vsti(cpr_path)
+                if vsti_list:
+                    self.vsti_text.setPlainText("\n".join(sorted(vsti_list)))
+                else:
+                    self.vsti_text.setPlainText("Aucun VSTi détecté dans ce projet.")
+            except Exception as e:
+                self.vsti_text.setPlainText(f"Erreur lors de l'analyse du fichier CPR : {e}")
+        else:
+            self.vsti_text.setPlainText("Aucun fichier CPR trouvé dans le dossier du projet.")
+
         # Message de statut
         self.statusBar.showMessage(f"Projet sélectionné: {project_name}")
     
