@@ -139,6 +139,71 @@ class WorkspaceWindow(BaseWindow):
         self.action_open_in_cubase.setShortcut(QKeySequence("Ctrl+P"))
         self.toolbar.addAction(self.action_open_in_cubase)
     
+    def open_vsti_manager_dialog(self):
+        from PyQt5.QtWidgets import QDialog, QVBoxLayout, QListWidget, QPushButton, QHBoxLayout, QInputDialog, QMessageBox
+        from services.vsti_manager import load_vsti_list, save_vsti_list
+        class VstiManagerDialog(QDialog):
+            def __init__(self, parent=None):
+                super().__init__(parent)
+                self.setWindowTitle("Gestion des VSTi connus")
+                self.setMinimumWidth(400)
+                layout = QVBoxLayout(self)
+                self.list_widget = QListWidget()
+                self.vsti_list = sorted(load_vsti_list(), key=lambda x: x.lower())
+                self.refresh_list()
+                layout.addWidget(self.list_widget)
+                btn_layout = QHBoxLayout()
+                self.btn_add = QPushButton("Ajouter")
+                self.btn_edit = QPushButton("Renommer")
+                self.btn_del = QPushButton("Supprimer")
+                btn_layout.addWidget(self.btn_add)
+                btn_layout.addWidget(self.btn_edit)
+                btn_layout.addWidget(self.btn_del)
+                layout.addLayout(btn_layout)
+                self.btn_add.clicked.connect(self.add_vsti)
+                self.btn_edit.clicked.connect(self.edit_vsti)
+                self.btn_del.clicked.connect(self.del_vsti)
+                self.list_widget.itemDoubleClicked.connect(self.edit_vsti)
+            def refresh_list(self):
+                self.list_widget.clear()
+                self.vsti_list.sort(key=lambda x: x.lower())
+                self.list_widget.addItems(self.vsti_list)
+            def save_and_refresh(self):
+                save_vsti_list(self.vsti_list)
+                self.refresh_list()
+            def add_vsti(self):
+                name, ok = QInputDialog.getText(self, "Ajouter un VSTi", "Nom du VSTi :")
+                if ok and name.strip():
+                    name = name.strip()
+                    if name not in self.vsti_list:
+                        self.vsti_list.append(name)
+                        self.save_and_refresh()
+            def edit_vsti(self):
+                item = self.list_widget.currentItem()
+                if not item:
+                    return
+                old = item.text()
+                new, ok = QInputDialog.getText(self, "Renommer le VSTi", "Nouveau nom :", text=old)
+                if ok and new.strip() and new != old:
+                    if new not in self.vsti_list:
+                        idx = self.vsti_list.index(old)
+                        self.vsti_list[idx] = new
+                        self.save_and_refresh()
+            def del_vsti(self):
+                item = self.list_widget.currentItem()
+                if not item:
+                    return
+                name = item.text()
+                r = QMessageBox.question(self, "Supprimer", f"Supprimer {name} ?")
+                if r == QMessageBox.Yes:
+                    self.vsti_list.remove(name)
+                    self.save_and_refresh()
+            def accept(self):
+                save_vsti_list(self.vsti_list)
+                super().accept()
+        dlg = VstiManagerDialog(self)
+        dlg.exec_()
+
     def setup_ui(self):
         """Configuration de l'interface utilisateur"""
         # Widget central déjà créé dans BaseWindow
@@ -320,7 +385,21 @@ class WorkspaceWindow(BaseWindow):
         self.vsti_text = QTextEdit()
         self.vsti_text.setReadOnly(True)
         self.vsti_text.setPlaceholderText("VSTi utilisés : sélectionnez un projet pour voir la liste.")
-        metadata_layout.addWidget(QLabel("<b>VSTi utilisés dans ce projet :</b>"))
+        # Ligne label + bouton paramètres
+        vsti_label_layout = QHBoxLayout()
+        vsti_label = QLabel("<b>VSTi utilisés dans ce projet :</b>")
+        vsti_label_layout.addWidget(vsti_label)
+        self.vsti_settings_btn = QToolButton()
+        # Icône roue dentée universelle (QStyle)
+        from PyQt5.QtWidgets import QStyle
+        style = self.style()
+        icon = style.standardIcon(QStyle.SP_FileDialogDetailedView)
+        self.vsti_settings_btn.setIcon(icon)
+        self.vsti_settings_btn.setToolTip("Gérer la liste des VSTi connus")
+        self.vsti_settings_btn.clicked.connect(self.open_vsti_manager_dialog)
+        vsti_label_layout.addWidget(self.vsti_settings_btn)
+        vsti_label_layout.addStretch(1)
+        metadata_layout.addLayout(vsti_label_layout)
         metadata_layout.addWidget(self.vsti_text)
 
         # Ajout des onglets

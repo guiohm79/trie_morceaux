@@ -1,5 +1,6 @@
 import re
 import os
+from services.vsti_manager import load_vsti_list
 
 def trouve_vsti(fichier):
     print(f"Analyse de : {os.path.basename(fichier)}")
@@ -7,34 +8,8 @@ def trouve_vsti(fichier):
     with open(fichier, "rb") as f:
         data = f.read()
     
-    # Liste BEAUCOUP plus complète
-    vsti_connus = [
-        # Synthés populaires
-        "Serum", "Spire", "Sylenth1", "Massive", "Massive X", "FM8", "Pigments", "Diva", "Zebra", 
-        "Omnisphere", "Nexus", "Vanguard", "Dune", "Avenger", "Phase Plant", "Vital", "Synth1", "Hive", "Repro",
-        
-        # Instruments samplés
-        "Kontakt", "PLAY", "Halion", "Falcon", "Padshop", "SampleTank", "Iris", "Analog Lab",
-        "LABS", "Spitfire", "Session Strings", "Addictive Drums", "Superior Drummer",
-        "EZdrummer", "Battery", "Drumlab", "Abbey Road Drums",
-        
-        # Boîtes à rythmes
-        "Kick 2", "Kick 3", "Punch", "Punchbox", "Drumbrute", "TR-8", "Addictive Drums", "BFD",
-        
-        # Workstations
-        "Komplete Kontrol", "Maschine", "V-Station", "MPC", "Reason Rack", "Arturia V",
-        "CODEX", "HALion Sonic", "Keyscape",
-        
-        # Plugins Steinberg/Cubase
-        "REVerence", "Groove Agent", "Padshop", "Retrologue", "Halion", "LoopMash",
-        "Mystic", "Prologue", "Embracer", "Backbone", "VST Amp Rack",
-        
-        # Effets
-        "FabFilter", "Soundtoys", "Valhalla", "Serum FX", "OTT", "Soothe", "Pro-Q", "Pro-C",
-        "Pro-L", "CLA-76", "Waves", "SSL", "Decapitator", "EchoBoy", "Saturn", "Pusher",
-        "Sausage Fattener", "Ozone", "Neutron", "Nectar", "Trash", "Effectrix", 
-        "Glitch", "RX", "iZotope", "PingPongDelay", "Replika", "Compressor", "Squasher"
-    ]
+    # Charger la liste des VSTi dynamiquement
+    vsti_connus = load_vsti_list()
     
     trouvés = set()  # On utilise un set pour éviter les doublons
     
