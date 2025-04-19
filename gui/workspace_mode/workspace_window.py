@@ -636,7 +636,7 @@ class WorkspaceWindow(BaseWindow):
         """
         if not project:
             return
-        
+    
         # Récupération des détails du projet
         project_name = project.get('project_name')
         
@@ -684,27 +684,38 @@ class WorkspaceWindow(BaseWindow):
             self._vsti_thread.wait(1000)
             self._vsti_thread = None
             self._vsti_worker = None
-        # Affichage de la barre de progression globale dès le début du chargement
+        
+        # 1. Configurez la barre de progression et rendez-la DÉFINITIVEMENT visible 
+        # avant de démarrer le thread
         self.vsti_progress.setMinimum(0)
-        self.vsti_progress.setMaximum(0)  # indéterminée
-        self.vsti_progress.setFormat('Chargement en cours...')
+        self.vsti_progress.setMaximum(0)  # Mode indéterminé
+        self.vsti_progress.setValue(0)
+        self.vsti_progress.setTextVisible(True)
+        self.vsti_progress.setFormat('Analyse du projet en cours...')
+        self.vsti_progress.setStyleSheet("QProgressBar { text-align: center; color: white; } QProgressBar::chunk { background-color: #007ACC; }")
         self.vsti_progress.setVisible(True)
-        self.vsti_progress.show()
-        print('[DEBUG] Barre de progression globale visible')
+        
+        # 2. CRUCIAL: Forcer le rafraîchissement de l'interface utilisateur
+        # pour garantir que la barre s'affiche immédiatement
+        from PyQt5.QtWidgets import QApplication
+        QApplication.processEvents()
+        
+        # Désactiver le texte pendant le chargement
+        self.vsti_text.setPlainText("Analyse des VSTi en cours, veuillez patienter...")
         self.vsti_text.setEnabled(False)
-        self._vsti_progress_shown_time = None
-        from PyQt5.QtCore import QTimer
-        self._vsti_hide_timer = QTimer(self)
-        self._vsti_hide_timer.setSingleShot(True)
-        self._vsti_hide_timer.timeout.connect(lambda: self.vsti_progress.hide())
+        
+        # Créer un thread pour l'analyse des VSTi
         from PyQt5.QtCore import QThread, pyqtSignal, QObject
         import traceback
+        
         class VstiWorker(QObject):
             finished = pyqtSignal(set, str)
             progressChanged = pyqtSignal(int)
+            
             def __init__(self, cpr_path):
                 super().__init__()
                 self.cpr_path = cpr_path
+                
             def run(self):
                 try:
                     from services.lectureCPR import trouve_vsti
@@ -720,6 +731,7 @@ class WorkspaceWindow(BaseWindow):
                 except Exception as e:
                     tb = traceback.format_exc()
                     self.finished.emit(set(), f"Erreur lors de l'analyse du fichier CPR : {e}\n{tb}")
+        
         # Recherche du CPR principal
         cpr_path = None
         if project_folder and os.path.exists(project_folder):
@@ -727,42 +739,56 @@ class WorkspaceWindow(BaseWindow):
                 if file.lower().endswith('.cpr'):
                     cpr_path = os.path.join(project_folder, file)
                     break
+        
+        # Créer et configurer le thread
         self._vsti_thread = QThread()
         self._vsti_worker = VstiWorker(cpr_path)
         self._vsti_worker.moveToThread(self._vsti_thread)
         self._vsti_thread.started.connect(self._vsti_worker.run)
-        import time
+        
+        # 3. Améliorer la gestion de la fin de l'analyse
         def on_vsti_finished(vsti_set, error):
-            elapsed = 0
-            if self._vsti_progress_shown_time is not None:
-                elapsed = (time.time() - self._vsti_progress_shown_time) * 1000  # ms
-            min_duration = 500  # ms
-            def hide_progress():
+            # Assurer un temps d'affichage minimum (1 seconde)
+            from PyQt5.QtCore import QTimer
+            
+            def hide_progress_later():
                 self.vsti_progress.setVisible(False)
-                self.vsti_progress.hide()
-                print('[DEBUG] Barre de progression VSTi masquée')
-            if elapsed < min_duration:
-                self._vsti_hide_timer.start(int(min_duration - elapsed))
-            else:
-                hide_progress()
+                print('[DEBUG] Barre de progression VSTi masquée après délai')
+            
+            # Activer le texte et afficher les résultats
             self.vsti_text.setEnabled(True)
+            
             if error:
                 self.vsti_text.setPlainText(error)
             elif vsti_set:
                 self.vsti_text.setPlainText("\n".join(sorted(vsti_set)))
             else:
                 self.vsti_text.setPlainText("Aucun VSTi détecté dans ce projet.")
+            
+            # Masquer la barre APRÈS un délai de 1 seconde
+            # Cela garantit que l'utilisateur voit que l'analyse est terminée
+            QTimer.singleShot(1000, hide_progress_later)
+            
+            # Nettoyer le thread
             self._vsti_thread.quit()
             self._vsti_thread.wait()
             self._vsti_thread = None
             self._vsti_worker = None
-        # Mémoriser le moment d'affichage de la barre
-        import time
-        self._vsti_progress_shown_time = time.time()
+        
+        # 4. Gérer les mises à jour de progression
         def on_vsti_progress(percent):
-            pass  # Désactivé, barre indéterminée
+            # Si vous souhaitez afficher la progression réelle
+            # au lieu d'une barre indéterminée, décommentez ces lignes:
+            self.vsti_progress.setMaximum(100)
+            self.vsti_progress.setValue(percent)
+            self.vsti_progress.setFormat(f"Analyse en cours... {percent}%")
+            pass
+        
+        # Connecter les signaux aux slots
         self._vsti_worker.finished.connect(on_vsti_finished)
         self._vsti_worker.progressChanged.connect(on_vsti_progress)
+        
+        # Démarrer le thread
         self._vsti_thread.start()
 
         # Message de statut
