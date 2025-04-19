@@ -81,7 +81,7 @@ class SortWindow(BaseWindow):
         
         # Initialisation des services
         self.scanner = CubaseScanner()
-        self.metadata_service = MetadataService(mode='centralized')
+        self.metadata_service = MetadataService(mode='local')
         self.file_service = FileService()
         self.audio_service = AudioService()
         self.cubase_service = CubaseService()
@@ -365,13 +365,19 @@ class SortWindow(BaseWindow):
         """
         if not project:
             return
-            
+        # Recherche la version corrigée dans self.all_projects_data
+        if hasattr(self, 'all_projects_data') and isinstance(self.all_projects_data, list):
+            project_name = project.get('project_name', '')
+            for p in self.all_projects_data:
+                if p.get('project_name', '') == project_name:
+                    project = p
+                    break
         # Mise à jour du projet sélectionné
         self.selected_project = project
         
         # Extraction du nom du projet
         project_name = project.get('project_name', '')
-        print(f"Projet sélectionné: {project_name}")
+        
         
         # Réinitialisation des métadonnées avant de les mettre à jour
         if hasattr(self, 'metadata_editor'):
@@ -458,28 +464,29 @@ class SortWindow(BaseWindow):
     
     def update_metadata(self, project):
         """Mise à jour de l'éditeur de métadonnées avec les métadonnées du projet"""
+        
         if not hasattr(self, 'metadata_editor'):
             return
-        
         project_name = project.get('project_name', '')
+        project_dir = project.get('project_dir', None)
         try:
-            # Récupérer les métadonnées du projet
-            metadata = self.metadata_service.get_project_metadata(project_name)
-            
-            # Mettre à jour l'éditeur de métadonnées
+            metadata = self.metadata_service.get_project_metadata(project_name, project_dir)
             if metadata:
-                self.metadata_editor.set_tags(metadata.get('tags', []))
-                self.metadata_editor.set_notes(metadata.get('notes', ''))
-                self.metadata_editor.set_rating(metadata.get('rating', 0))
+                notes = metadata.get('notes', '')
+                if notes is None:
+                    notes = ''
+                else:
+                    notes = str(notes)
+                self.metadata_editor.set_metadata({
+                    'tags': metadata.get('tags', []),
+                    'notes': notes,
+                    'rating': metadata.get('rating', 0)
+                })
             else:
                 # Réinitialisation de l'éditeur si aucune métadonnée n'est trouvée
-                self.metadata_editor.set_tags([])
-                self.metadata_editor.set_notes('')
-                self.metadata_editor.set_rating(0)
-                
+                self.metadata_editor.set_metadata({'tags': [], 'notes': '', 'rating': 0})
             # Stockage du nom du projet pour la sauvegarde
             self.metadata_editor.current_project = project_name
-            
         except Exception as e:
             print(f"ERREUR lors de la récupération des métadonnées: {str(e)}")
     
@@ -508,7 +515,7 @@ class SortWindow(BaseWindow):
                 'tags': tags,
                 'notes': notes,
                 'rating': rating,
-                'last_saved': datetime.datetime.now().isoformat()
+                'last_saved': datetime.now().isoformat()
             }
             
             # Sauvegarde des métadonnées
@@ -546,6 +553,8 @@ class SortWindow(BaseWindow):
         
         # Mise à jour de la table des projets
         self.project_table.update_data(self.all_projects_data)
+        # Connexion du signal pour sélectionner le projet depuis la table
+        self.project_table.project_selected.connect(self.on_project_selected)
         
         # Message de statut
         self.statusBar.showMessage(f"{len(self.all_projects_data)} projets trouvés")

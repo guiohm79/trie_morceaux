@@ -1328,7 +1328,7 @@ class WorkspaceWindow(BaseWindow):
                         metadata[key] = value
             
             # Ajouter la date de sauvegarde aux métadonnées
-            metadata['saved_date'] = datetime.datetime.now().isoformat()
+            metadata['saved_date'] = datetime.now().isoformat()
             metadata['name'] = project_name
             
             # Sauvegarde des métadonnées

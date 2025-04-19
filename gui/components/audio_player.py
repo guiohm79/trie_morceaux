@@ -75,17 +75,10 @@ class AudioPlayer(QWidget):
         self.lbl_position = QLabel("00:00")
         self.lbl_duration = QLabel("00:00")
         
-        # Slider pour la position
-        self.slider_position = QSlider(Qt.Horizontal)
-        self.slider_position.setRange(0, 0)
-        self.slider_position.sliderMoved.connect(self.set_position)
-        self.slider_position.setEnabled(False)
-        
         # Ajout des widgets au layout des contrôles
         controls_layout.addWidget(self.btn_play)
         controls_layout.addWidget(self.btn_stop)
         controls_layout.addWidget(self.lbl_position)
-        controls_layout.addWidget(self.slider_position)
         controls_layout.addWidget(self.lbl_duration)
         
         # Ajout du layout des contrôles au layout principal
@@ -115,7 +108,6 @@ class AudioPlayer(QWidget):
             self.current_file = None
             self.btn_play.setEnabled(False)
             self.btn_stop.setEnabled(False)
-            self.slider_position.setEnabled(False)
             return False
         
         # Mise à jour de l'interface
@@ -130,7 +122,6 @@ class AudioPlayer(QWidget):
         # Activation des contrôles
         self.btn_play.setEnabled(True)
         self.btn_stop.setEnabled(False)
-        self.slider_position.setEnabled(True)
         
         return True
     
@@ -178,11 +169,6 @@ class AudioPlayer(QWidget):
         Args:
             position (int): Nouvelle position en millisecondes
         """
-        # Mise à jour du slider sans émettre de signal
-        self.slider_position.blockSignals(True)
-        self.slider_position.setValue(position)
-        self.slider_position.blockSignals(False)
-        
         # Mise à jour du label de position
         minutes = position // 60000
         seconds = (position % 60000) // 1000
@@ -195,9 +181,6 @@ class AudioPlayer(QWidget):
         Args:
             duration (int): Durée en millisecondes
         """
-        # Mise à jour de la plage du slider
-        self.slider_position.setRange(0, duration)
-        
         # Mise à jour du label de durée
         minutes = duration // 60000
         seconds = (duration % 60000) // 1000
@@ -211,6 +194,7 @@ class AudioPlayer(QWidget):
             position (int): Position en millisecondes
         """
         self.player.setPosition(position)
+        # Plus de synchronisation avec slider
     
     def update_position(self):
         """Mise à jour de la position actuelle"""

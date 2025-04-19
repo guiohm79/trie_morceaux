@@ -38,7 +38,6 @@ class CubaseScanner:
             dict: Dictionnaire des projets trouvés
         """
         root_path = Path(root_dir)
-        print(f"Scan du dossier: {root_path} (existe: {root_path.exists()})")
         
         if not root_path.exists():
             print(f"Le dossier {root_path} n'existe pas!")
@@ -109,8 +108,6 @@ class CubaseScanner:
                     'source': str(root_path)
                 })
         
-        print(f"Scan terminé pour {root_path}, {file_count} fichiers trouvés")
-        
         # Conversion en DataFrame pour faciliter l'analyse
         self._create_dataframe()
         
@@ -152,10 +149,18 @@ class CubaseScanner:
                 project_data['other_files']
             ] for f in files)
             
+            # Correction : si project_dir est vide, on le déduit du chemin du dernier fichier trouvé
+            project_dir = project_data.get('project_dir', '')
+            if not project_dir:
+                # Cherche le chemin du dossier du dernier fichier CPR/Bak/Wav/Other trouvé
+                for key in ['cpr_files', 'bak_files', 'wav_files', 'other_files']:
+                    if project_data[key]:
+                        project_dir = str(Path(project_data[key][-1]['path']).parent)
+                        break
             data.append({
                 'project_name': project_name,
                 'source': project_data.get('source', ''),
-                'project_dir': project_data.get('project_dir', ''),  # Ajout du chemin du dossier du projet
+                'project_dir': project_dir,
                 'latest_cpr': latest_cpr['path'] if latest_cpr else None,
                 'latest_cpr_date': latest_cpr['modified'] if latest_cpr else None,
                 'cpr_count': len(project_data['cpr_files']),

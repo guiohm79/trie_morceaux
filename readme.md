@@ -8,6 +8,13 @@ Le projet a été restructuré selon l'architecture proposée dans le cahier des
 
 ### Améliorations Récentes
 
+#### Avril 2025
+- **Mode Tri : gestion des métadonnées 100% locale** : Les métadonnées (tags, notes, notation) sont désormais toujours lues et écrites dans le fichier local du projet. Le mode Tri n’utilise plus le fichier centralisé, ce qui garantit l’indépendance et la cohérence des informations pour chaque projet.
+- **Correction automatique du champ `project_dir`** : Lors du scan en mode Tri, le chemin du dossier projet est systématiquement corrigé/déduit pour chaque projet, même si absent initialement. Cela supprime les avertissements et garantit le bon fonctionnement de la gestion locale des métadonnées.
+- **Nettoyage des messages de debug** : Tous les prints et messages de debug ont été supprimés pour une console propre et professionnelle.
+- **Affichage fiable des métadonnées** : L’éditeur de métadonnées affiche toujours le contenu réel du fichier local du projet sélectionné.
+
+
 1. **Mode Tri (multi-sources)** :
    - Implémentation d'une structure de dossiers standard Cubase lors de la sauvegarde des projets
    - Création automatique des dossiers Audio, Auto Saves, Edits, Images et Presets
@@ -48,6 +55,13 @@ Le projet a été restructuré selon l'architecture proposée dans le cahier des
    - Élimination des messages de confirmation redondants
 
 ### Problèmes Résolus
+
+#### Avril 2025
+- Suppression définitive des erreurs liées au champ `project_dir` manquant en mode Tri.
+- Plus aucun risque de confusion ou d’écrasement entre métadonnées locales et centralisées.
+- L’interface et la console sont désormais propres (aucun message de debug ou print parasite).
+- Les métadonnées affichées et sauvegardées correspondent toujours au fichier local du projet.
+
 
 1. **Gestion des métadonnées en mode local** : 
    - Ajout du champ `project_dir` dans le scanner pour stocker correctement le chemin du dossier de chaque projet

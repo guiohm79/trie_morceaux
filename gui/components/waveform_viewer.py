@@ -29,12 +29,12 @@ class ModernWaveformPlayer(QWidget):
         self.current_time_label = QLabel("0:00")
         self.duration_label = QLabel("0:00")
         self.current_time_label.setStyleSheet("font-size: 40px; font-weight: bold; color: #FFA000; padding: 0 10px;")
-        self.duration_label.setStyleSheet("font-size: 40px; font-weight: bold; color: #FFF; padding: 0 10px;")
+        self.duration_label.setStyleSheet("font-size: 40px; font-weight: bold; color: #f18300; padding: 0 10px;")
         timer_layout.addStretch()
         timer_layout.addWidget(self.current_time_label)
         # Séparateur visuel moderne
         sep = QLabel("/")
-        sep.setStyleSheet("font-size: 40px; font-weight: bold; color: #888; padding: 0 10px;")
+        sep.setStyleSheet("font-size: 50px; font-weight: bold; color: #555; padding: 0 10px;")
         timer_layout.addWidget(sep)
         timer_layout.addWidget(self.duration_label)
         timer_layout.addStretch()
@@ -142,8 +142,8 @@ class WaveformWidget(QWidget):
         
         # Couleurs
         self.played_color = QColor(255, 120, 0)  # Orange pour la partie jouée
-        self.remaining_color = QColor(255, 255, 255)  # Blanc pour la partie restante
-        self.background_color = QColor(30, 30, 30)  # Fond presque noir
+        self.remaining_color = QColor(241, 184, 140)  # Blanc pour la partie restante
+        self.background_color = QColor(30, 30, 30, 0)  # Fond presque noir
 
     def set_duration(self, duration):
         self.duration = duration
