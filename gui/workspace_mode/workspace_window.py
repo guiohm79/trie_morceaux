@@ -369,8 +369,11 @@ class WorkspaceWindow(BaseWindow):
         self.audio_player.setVisible(False)  # Masqué par défaut
 
         # Visualisation de la forme d'onde (nouvelle version)
-        self.waveform_viewer = ModernWaveformPlayer()
+        self.waveform_viewer = ModernWaveformPlayer(self)
+        self.waveform_viewer.link_audio_player(self.audio_player)
         self.waveform_viewer.setVisible(False)
+        # Suppression du slider d'avancement : aucune création de QSlider ni ajout dans le layout
+        # Le minuteur moderne sera affiché dans ModernWaveformPlayer
 
         # Initialisation du service audio
         self.audio_service.initialize_player(self.audio_player)

@@ -1,5 +1,5 @@
 import numpy as np
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QSlider
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QPainter, QColor, QPen, QLinearGradient, QBrush
 from scipy.io import wavfile
@@ -24,31 +24,42 @@ class ModernWaveformPlayer(QWidget):
         self.waveform_widget = WaveformWidget(self)
         layout.addWidget(self.waveform_widget)
         
-        # Contrôles (temps actuel et durée totale)
-        controls_layout = QHBoxLayout()
+        # Minuteur moderne sous la waveform
+        timer_layout = QHBoxLayout()
         self.current_time_label = QLabel("0:00")
         self.duration_label = QLabel("0:00")
+        self.current_time_label.setStyleSheet("font-size: 40px; font-weight: bold; color: #FFA000; padding: 0 10px;")
+        self.duration_label.setStyleSheet("font-size: 40px; font-weight: bold; color: #FFF; padding: 0 10px;")
+        timer_layout.addStretch()
+        timer_layout.addWidget(self.current_time_label)
+        # Séparateur visuel moderne
+        sep = QLabel("/")
+        sep.setStyleSheet("font-size: 40px; font-weight: bold; color: #888; padding: 0 10px;")
+        timer_layout.addWidget(sep)
+        timer_layout.addWidget(self.duration_label)
+        timer_layout.addStretch()
+        layout.addLayout(timer_layout)
+        # Référence au player audio PyQt
+        self.audio_player = None
         
-        # Position slider
-        self.position_slider = QSlider(Qt.Horizontal)
-        self.position_slider.setRange(0, 1000)
-        self.position_slider.setValue(0)
-        self.position_slider.sliderMoved.connect(self.seek_position)
-        
-        controls_layout.addWidget(self.current_time_label)
-        controls_layout.addWidget(self.position_slider)
-        controls_layout.addWidget(self.duration_label)
-        
-        layout.addLayout(controls_layout)
-        
-        # Timer pour simuler la lecture
-        self.timer = QTimer(self)
-        self.timer.setInterval(50)  # Mise à jour toutes les 50ms
-        self.timer.timeout.connect(self.update_position)
-        
-        # États
-        self.is_playing = False
-        
+    def link_audio_player(self, audio_player):
+        """Connecte le player audio PyQt pour synchronisation"""
+        self.audio_player = audio_player
+        # Connexion des signaux de position/durée
+        self.audio_player.player.positionChanged.connect(self.on_audio_position_changed)
+        self.audio_player.player.durationChanged.connect(self.on_audio_duration_changed)
+
+    def on_audio_position_changed(self, position_ms):
+        if self.duration > 0:
+            progress = position_ms / (self.duration * 1000)
+            self.waveform_widget.set_progress(progress)
+            self.current_time_label.setText(self.format_time(position_ms / 1000))
+
+    def on_audio_duration_changed(self, duration_ms):
+        self.duration = duration_ms / 1000
+        self.duration_label.setText(self.format_time(self.duration))
+        self.waveform_widget.set_duration(self.duration)
+
     def load_file(self, file_path):
         """Charge un fichier audio et prépare la visualisation"""
         try:
@@ -65,7 +76,8 @@ class ModernWaveformPlayer(QWidget):
             
             # Sous-échantillonner pour l'affichage
             # Pour un affichage fluide, réduire à ~1000-2000 points
-            step = max(1, len(data) // 1500)
+            n_points = min(1500, len(data))
+            step = max(1, len(data) // n_points)
             waveform_data = data[::step]
             
             # Stocker les données
@@ -80,9 +92,7 @@ class ModernWaveformPlayer(QWidget):
             
             # Mettre à jour le widget de forme d'onde
             self.waveform_widget.set_waveform_data(waveform_data)
-            
-            # Réinitialiser le slider
-            self.position_slider.setValue(0)
+            self.waveform_widget.set_duration(self.duration)
             
             return True
         except Exception as e:
@@ -93,63 +103,25 @@ class ModernWaveformPlayer(QWidget):
     
     def play_pause(self):
         """Démarre ou met en pause la lecture"""
-        if not self.waveform_data is None:
-            self.is_playing = not self.is_playing
-            
-            if self.is_playing:
-                self.timer.start()
-            else:
-                self.timer.stop()
-                
-            return self.is_playing
+        if self.audio_player:
+            self.audio_player.toggle_playback()
+            return True
         return False
     
     def stop(self):
         """Arrête la lecture et réinitialise la position"""
-        self.is_playing = False
-        self.timer.stop()
-        self.current_position = 0
-        self.position_slider.setValue(0)
+        if self.audio_player:
+            self.audio_player.stop_playback()
         self.current_time_label.setText(self.format_time(0))
         self.waveform_widget.set_progress(0)
         
-    def update_position(self):
-        """Met à jour la position de lecture"""
-        if self.duration > 0:
-            # Simuler l'avancement (dans une vraie implémentation, vous obtiendriez 
-            # cette valeur depuis le lecteur audio réel)
-            self.current_position += 0.05  # +50ms
-            
-            if self.current_position >= self.duration:
-                self.stop()
-                return
-            
-            # Calculer la progression en pourcentage
-            progress = self.current_position / self.duration
-            
-            # Mettre à jour le slider
-            self.position_slider.setValue(int(progress * 1000))
-            
-            # Mettre à jour le label de temps
-            self.current_time_label.setText(self.format_time(self.current_position))
-            
-            # Mettre à jour la visualisation
-            self.waveform_widget.set_progress(progress)
+    # update_position supprimé (plus de simulation, synchronisation réelle via signaux)
     
-    def seek_position(self, value):
-        """Change la position de lecture"""
-        if self.duration > 0:
-            # Calculer la nouvelle position
-            position = (value / 1000) * self.duration
-            
-            # Mettre à jour la position actuelle
-            self.current_position = position
-            
-            # Mettre à jour le label de temps
-            self.current_time_label.setText(self.format_time(position))
-            
-            # Mettre à jour la visualisation
-            self.waveform_widget.set_progress(value / 1000)
+    def on_waveform_seek(self, percent):
+        """Seek audio lors d'un clic sur la waveform"""
+        if self.audio_player and self.duration > 0:
+            new_position_ms = int(percent * self.duration * 1000)
+            self.audio_player.set_position(new_position_ms)
     
     def format_time(self, seconds):
         """Formate le temps en minutes:secondes"""
@@ -166,16 +138,39 @@ class WaveformWidget(QWidget):
         # Données pour le rendu
         self.waveform_data = None
         self.progress = 0  # 0 à 1
+        self.duration = 0  # Durée en secondes
         
         # Couleurs
         self.played_color = QColor(255, 120, 0)  # Orange pour la partie jouée
         self.remaining_color = QColor(255, 255, 255)  # Blanc pour la partie restante
         self.background_color = QColor(30, 30, 30)  # Fond presque noir
+
+    def set_duration(self, duration):
+        self.duration = duration
+        self.update()
+
+    def format_time(self, seconds):
+        seconds = int(seconds)
+        minutes = seconds // 60
+        seconds = seconds % 60
+        return f"{minutes}:{seconds:02d}"
         
     def set_waveform_data(self, data):
         """Définit les données de forme d'onde à afficher"""
         self.waveform_data = data
         self.update()
+
+    def set_duration(self, duration):
+        self.duration = duration
+        self.update()
+
+    def mousePressEvent(self, event):
+        if self.waveform_data is None or not hasattr(self.parent(), 'on_waveform_seek'):
+            return
+        x = event.x()
+        percent = x / self.width()
+        self.parent().on_waveform_seek(percent)
+
         
     def set_progress(self, progress):
         """Définit la progression de la lecture (0-1)"""
@@ -246,4 +241,4 @@ class WaveformWidget(QWidget):
         
         # Fin (toujours blanc)
         painter.setPen(self.remaining_color)
-        painter.drawText(width - 40, height - 5, "5:37")  # Exemple de durée
+        painter.drawText(width - 40, height - 5, self.format_time(self.duration))
