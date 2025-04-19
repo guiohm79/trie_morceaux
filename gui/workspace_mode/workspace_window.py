@@ -27,6 +27,7 @@ from gui.components.audio_player import AudioPlayer
 from gui.components.file_tree import FileTree
 from gui.components.metadata_editor import MetadataEditor
 from gui.components.project_table import ProjectTable
+from gui.components.waveform_viewer import ModernWaveformPlayer
 
 from services.scanner import CubaseScanner
 from services.metadata_service import MetadataService
@@ -366,11 +367,16 @@ class WorkspaceWindow(BaseWindow):
         # Lecteur audio pour les fichiers WAV
         self.audio_player = AudioPlayer()
         self.audio_player.setVisible(False)  # Masqué par défaut
-        
+
+        # Visualisation de la forme d'onde (nouvelle version)
+        self.waveform_viewer = ModernWaveformPlayer()
+        self.waveform_viewer.setVisible(False)
+
         # Initialisation du service audio
         self.audio_service.initialize_player(self.audio_player)
-        
+
         files_layout.addWidget(self.audio_player)
+        files_layout.addWidget(self.waveform_viewer)
         
         # Onglet des métadonnées
         metadata_tab = QWidget()
@@ -861,6 +867,11 @@ class WorkspaceWindow(BaseWindow):
                 # Lecture du fichier WAV
                 self.audio_service.load_file(path)
                 self.audio_player.setVisible(True)
+                # Affichage de la forme d'onde (nouvelle version)
+                if self.waveform_viewer.load_file(path):
+                    self.waveform_viewer.setVisible(True)
+                else:
+                    self.waveform_viewer.setVisible(False)
                 self.audio_service.play()
             elif file_path.suffix.lower() == '.cpr':
                 # Ouverture du fichier CPR dans Cubase

@@ -3,6 +3,7 @@ PyQt5==5.15.7
 PyQt5-Qt5>=5.15.2
 mutagen==1.46.0
 pygame==2.5.2
+librosa==0.10.1
 
 # Dépendances pour les améliorations futures
 pandas>=1.5.3        # Pour l'analyse de données et la gestion des métadonnées
