@@ -401,6 +401,15 @@ class WorkspaceWindow(BaseWindow):
         vsti_label_layout.addStretch(1)
         metadata_layout.addLayout(vsti_label_layout)
         metadata_layout.addWidget(self.vsti_text)
+        # Barre de progression globale sous le menu (layout principal)
+        self.vsti_progress = QProgressBar()
+        self.vsti_progress.setMinimum(0)
+        self.vsti_progress.setMaximum(100)
+        self.vsti_progress.setValue(0)
+        self.vsti_progress.setVisible(False)
+        self.vsti_progress.setTextVisible(True)
+        self.main_layout.insertWidget(1, self.vsti_progress)  # Juste après le menu/label workspace
+        print('[DEBUG] Barre de progression VSTi ajoutée au layout principal')
 
         # Ajout des onglets
         self.details_tabs.addTab(files_tab, "Lecteur Audio")
@@ -450,72 +459,97 @@ class WorkspaceWindow(BaseWindow):
     
     def setup_workspace_view(self, directory):
         """
-        Configuration de la vue pour le workspace
-        
+        Configuration de la vue pour le workspace (ASYNCHRONE avec barre de progression)
         Args:
             directory (str): Chemin du dossier de travail
         """
         # Pour l'arborescence gauche, on affiche tout le système de fichiers
-        # en utilisant une chaîne vide comme racine pour voir tous les lecteurs
         self.file_tree_left.set_root_path("")
-        # Présélectionner le dossier de travail pour faciliter la navigation
         self.file_tree_left.setCurrentIndex(self.file_tree_left.fs_model.index(directory))
         self.file_tree_left.scrollTo(self.file_tree_left.fs_model.index(directory))
         self.file_tree_left.expand(self.file_tree_left.fs_model.index(directory))
-        
-        # Scan du dossier pour trouver les projets
-        self.scanner.clear()
-        self.scanner.scan_directory(directory)
-        
-        # S'assurer que tous les projets ont un chemin de dossier valide
-        for project_name, project_data in self.scanner.projects.items():
-            # Vérifier si le chemin du projet est déjà défini et valide
-            project_dir = project_data.get('project_dir', '')
-            if not project_dir or not os.path.exists(project_dir):
-                # Stratégie 1: Utiliser le dossier du premier fichier CPR
-                if project_data.get('cpr_files') and len(project_data['cpr_files']) > 0:
-                    first_cpr = project_data['cpr_files'][0]
-                    project_dir = os.path.dirname(first_cpr['path'])
-                    project_data['project_dir'] = project_dir
-                    print(f"Chemin du projet '{project_name}' défini à partir du fichier CPR: {project_dir}")
-                # Stratégie 2: Utiliser le dossier du premier fichier WAV
-                elif project_data.get('wav_files') and len(project_data['wav_files']) > 0:
-                    first_wav = project_data['wav_files'][0]
-                    project_dir = os.path.dirname(first_wav['path'])
-                    project_data['project_dir'] = project_dir
-                    print(f"Chemin du projet '{project_name}' défini à partir du fichier WAV: {project_dir}")
-                # Stratégie 3: Utiliser le dossier du premier fichier BAK
-                elif project_data.get('bak_files') and len(project_data['bak_files']) > 0:
-                    first_bak = project_data['bak_files'][0]
-                    project_dir = os.path.dirname(first_bak['path'])
-                    project_data['project_dir'] = project_dir
-                    print(f"Chemin du projet '{project_name}' défini à partir du fichier BAK: {project_dir}")
-                # Stratégie 4: Utiliser le dossier du premier fichier quelconque
-                elif project_data.get('other_files') and len(project_data['other_files']) > 0:
-                    first_other = project_data['other_files'][0]
-                    project_dir = os.path.dirname(first_other['path'])
-                    project_data['project_dir'] = project_dir
-                    print(f"Chemin du projet '{project_name}' défini à partir d'un autre fichier: {project_dir}")
-                # Stratégie 5: Utiliser le chemin complet du projet dans le workspace
-                else:
-                    project_dir = os.path.join(directory, project_name)
-                    if os.path.exists(project_dir) and os.path.isdir(project_dir):
+
+        # Afficher la barre de progression en mode indéterminé (marquee)
+        self.vsti_progress.setVisible(True)
+        self.vsti_progress.setMinimum(0)
+        self.vsti_progress.setMaximum(0)  # Indéterminé
+        self.vsti_progress.setFormat("Scan des projets en cours...")
+        from PyQt5.QtWidgets import QApplication
+        QApplication.processEvents()  # Forcer le rafraîchissement de l'UI pour afficher la barre
+
+        # Thread et worker pour le scan
+        from PyQt5.QtCore import QObject, pyqtSignal
+        class WorkspaceScanWorker(QObject):
+            progressChanged = pyqtSignal(int)
+            finished = pyqtSignal(object)
+            def __init__(self, scanner, directory):
+                super().__init__()
+                self.scanner = scanner
+                self.directory = directory
+            def run(self):
+                import os
+                self.scanner.clear()
+                # Compter ET scanner dans le worker pour ne rien bloquer
+                total = 0
+                for _ in os.walk(self.directory):
+                    total += 1
+                current = 0
+                for root, dirs, files in os.walk(self.directory):
+                    self.scanner.scan_directory(root)
+                    current += 1
+                    percent = int((current / total) * 100) if total > 0 else 100
+                    self.progressChanged.emit(percent)
+                self.finished.emit(self.scanner)
+
+        # Arrêter un éventuel thread précédent
+        if hasattr(self, 'scan_thread') and self.scan_thread is not None:
+            if self.scan_thread.isRunning():
+                self.scan_thread.quit()
+                self.scan_thread.wait()
+        self.scan_thread = QThread()
+        self.scan_worker = WorkspaceScanWorker(self.scanner, directory)
+        self.scan_worker.moveToThread(self.scan_thread)
+        self.scan_thread.started.connect(self.scan_worker.run)
+        self.scan_worker.progressChanged.connect(self.vsti_progress.setValue)
+
+        def on_scan_finished(scanner):
+            for project_name, project_data in scanner.projects.items():
+                project_dir = project_data.get('project_dir', '')
+                if not project_dir or not os.path.exists(project_dir):
+                    if project_data.get('cpr_files') and len(project_data['cpr_files']) > 0:
+                        first_cpr = project_data['cpr_files'][0]
+                        project_dir = os.path.dirname(first_cpr['path'])
                         project_data['project_dir'] = project_dir
-                        print(f"Chemin du projet '{project_name}' défini à partir du dossier: {project_dir}")
+                    elif project_data.get('wav_files') and len(project_data['wav_files']) > 0:
+                        first_wav = project_data['wav_files'][0]
+                        project_dir = os.path.dirname(first_wav['path'])
+                        project_data['project_dir'] = project_dir
+                    elif project_data.get('bak_files') and len(project_data['bak_files']) > 0:
+                        first_bak = project_data['bak_files'][0]
+                        project_dir = os.path.dirname(first_bak['path'])
+                        project_data['project_dir'] = project_dir
+                    elif project_data.get('other_files') and len(project_data['other_files']) > 0:
+                        first_other = project_data['other_files'][0]
+                        project_dir = os.path.dirname(first_other['path'])
+                        project_data['project_dir'] = project_dir
                     else:
-                        # Dernier recours: utiliser le dossier racine
-                        project_data['project_dir'] = directory
-                        print(f"Chemin du projet '{project_name}' défini à partir du dossier racine: {directory}")
-        
-        # Recréer le DataFrame après avoir mis à jour les chemins des projets
-        self.scanner._create_dataframe()
-        
-        # Mise à jour de la table des projets
-        self.all_projects_data = self.scanner.df_projects
-        self.project_table.update_data(self.all_projects_data)
-        
-        # Message de statut
-        self.statusBar.showMessage(f"{len(self.all_projects_data)} projets trouvés dans le dossier de travail")
+                        project_dir = os.path.join(directory, project_name)
+                        if os.path.exists(project_dir) and os.path.isdir(project_dir):
+                            project_data['project_dir'] = project_dir
+                        else:
+                            project_data['project_dir'] = directory
+            scanner._create_dataframe()
+            self.all_projects_data = scanner.df_projects
+            self.project_table.update_data(self.all_projects_data)
+            self.vsti_progress.setMaximum(100)
+            self.vsti_progress.setValue(100)
+            self.vsti_progress.setVisible(False)
+            self.statusBar.showMessage(f"{len(self.all_projects_data)} projets trouvés dans le dossier de travail")
+            self.scan_thread.quit()
+            self.scan_thread.wait()
+        self.scan_worker.finished.connect(on_scan_finished)
+        self.scan_thread.start()
+
     
     def reset_workspace(self):
         """Réinitialisation du workspace"""
@@ -643,9 +677,49 @@ class WorkspaceWindow(BaseWindow):
         except Exception as e:
             print(f"Erreur lors de la récupération des métadonnées: {e}")
 
-        # Recherche et affichage des VSTi
-        self.vsti_text.clear()
-        vsti_list = set()
+        # Arrêt propre du thread VSTi précédent s'il existe
+        if hasattr(self, '_vsti_thread') and self._vsti_thread is not None:
+            print('[DEBUG] Arrêt du thread VSTi précédent...')
+            self._vsti_thread.quit()
+            self._vsti_thread.wait(1000)
+            self._vsti_thread = None
+            self._vsti_worker = None
+        # Affichage de la barre de progression globale dès le début du chargement
+        self.vsti_progress.setMinimum(0)
+        self.vsti_progress.setMaximum(0)  # indéterminée
+        self.vsti_progress.setFormat('Chargement en cours...')
+        self.vsti_progress.setVisible(True)
+        self.vsti_progress.show()
+        print('[DEBUG] Barre de progression globale visible')
+        self.vsti_text.setEnabled(False)
+        self._vsti_progress_shown_time = None
+        from PyQt5.QtCore import QTimer
+        self._vsti_hide_timer = QTimer(self)
+        self._vsti_hide_timer.setSingleShot(True)
+        self._vsti_hide_timer.timeout.connect(lambda: self.vsti_progress.hide())
+        from PyQt5.QtCore import QThread, pyqtSignal, QObject
+        import traceback
+        class VstiWorker(QObject):
+            finished = pyqtSignal(set, str)
+            progressChanged = pyqtSignal(int)
+            def __init__(self, cpr_path):
+                super().__init__()
+                self.cpr_path = cpr_path
+            def run(self):
+                try:
+                    from services.lectureCPR import trouve_vsti
+                    import os
+                    found = set()
+                    if self.cpr_path and os.path.exists(self.cpr_path):
+                        def progress_callback(percent):
+                            self.progressChanged.emit(percent)
+                        found = trouve_vsti(self.cpr_path, progress_callback=progress_callback)
+                        self.finished.emit(found, "")
+                    else:
+                        self.finished.emit(set(), "Aucun fichier CPR trouvé dans le dossier du projet.")
+                except Exception as e:
+                    tb = traceback.format_exc()
+                    self.finished.emit(set(), f"Erreur lors de l'analyse du fichier CPR : {e}\n{tb}")
         # Recherche du CPR principal
         cpr_path = None
         if project_folder and os.path.exists(project_folder):
@@ -653,17 +727,43 @@ class WorkspaceWindow(BaseWindow):
                 if file.lower().endswith('.cpr'):
                     cpr_path = os.path.join(project_folder, file)
                     break
-        if cpr_path and os.path.exists(cpr_path):
-            try:
-                vsti_list = trouve_vsti(cpr_path)
-                if vsti_list:
-                    self.vsti_text.setPlainText("\n".join(sorted(vsti_list)))
-                else:
-                    self.vsti_text.setPlainText("Aucun VSTi détecté dans ce projet.")
-            except Exception as e:
-                self.vsti_text.setPlainText(f"Erreur lors de l'analyse du fichier CPR : {e}")
-        else:
-            self.vsti_text.setPlainText("Aucun fichier CPR trouvé dans le dossier du projet.")
+        self._vsti_thread = QThread()
+        self._vsti_worker = VstiWorker(cpr_path)
+        self._vsti_worker.moveToThread(self._vsti_thread)
+        self._vsti_thread.started.connect(self._vsti_worker.run)
+        import time
+        def on_vsti_finished(vsti_set, error):
+            elapsed = 0
+            if self._vsti_progress_shown_time is not None:
+                elapsed = (time.time() - self._vsti_progress_shown_time) * 1000  # ms
+            min_duration = 500  # ms
+            def hide_progress():
+                self.vsti_progress.setVisible(False)
+                self.vsti_progress.hide()
+                print('[DEBUG] Barre de progression VSTi masquée')
+            if elapsed < min_duration:
+                self._vsti_hide_timer.start(int(min_duration - elapsed))
+            else:
+                hide_progress()
+            self.vsti_text.setEnabled(True)
+            if error:
+                self.vsti_text.setPlainText(error)
+            elif vsti_set:
+                self.vsti_text.setPlainText("\n".join(sorted(vsti_set)))
+            else:
+                self.vsti_text.setPlainText("Aucun VSTi détecté dans ce projet.")
+            self._vsti_thread.quit()
+            self._vsti_thread.wait()
+            self._vsti_thread = None
+            self._vsti_worker = None
+        # Mémoriser le moment d'affichage de la barre
+        import time
+        self._vsti_progress_shown_time = time.time()
+        def on_vsti_progress(percent):
+            pass  # Désactivé, barre indéterminée
+        self._vsti_worker.finished.connect(on_vsti_finished)
+        self._vsti_worker.progressChanged.connect(on_vsti_progress)
+        self._vsti_thread.start()
 
         # Message de statut
         self.statusBar.showMessage(f"Projet sélectionné: {project_name}")

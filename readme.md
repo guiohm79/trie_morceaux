@@ -37,6 +37,9 @@ Le projet a été restructuré selon l'architecture proposée dans le cahier des
    - Résolution des erreurs lors de l'enregistrement des métadonnées
 
 4. **Interface utilisateur** :
+   - Ajout d'une barre de progression globale lors du chargement d'un projet (mode Espace de Travail) : affichée sous le menu, avec le message "Chargement en cours...", visible pendant tout le chargement (scan, métadonnées, analyse VSTi)
+   - L'analyse des VSTi s'effectue désormais en tâche de fond (thread dédié) pour garantir la fluidité de l'interface, même sur de gros projets
+   - Affichage minimum garanti de la barre pour un meilleur feedback utilisateur, gestion robuste de l'arrêt des threads lors des changements rapides de projet
    - Amélioration de la navigation entre les modes Tri et Espace de Travail
    - Sauvegarde du dernier mode utilisé dans les paramètres
    - Préservation de la position et taille de la fenêtre lors du changement de mode

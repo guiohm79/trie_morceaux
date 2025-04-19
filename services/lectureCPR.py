@@ -2,7 +2,7 @@ import re
 import os
 from services.vsti_manager import load_vsti_list
 
-def trouve_vsti(fichier):
+def trouve_vsti(fichier, progress_callback=None):
     print(f"Analyse de : {os.path.basename(fichier)}")
     
     with open(fichier, "rb") as f:
@@ -13,22 +13,30 @@ def trouve_vsti(fichier):
     
     trouvés = set()  # On utilise un set pour éviter les doublons
     
+    total = len(vsti_connus) * 2  # Boucles numérotés + sans numéro
+    progress = 0
     # Cherchons les VSTi numérotés (comme "Serum 01", "Kick 2 01", etc.)
-    for vsti in vsti_connus:
+    for idx, vsti in enumerate(vsti_connus):
         pattern = re.compile(f"{vsti}\\s+\\d{{2}}".encode('utf-8'))
         matches = pattern.findall(data)
         for match in matches:
             trouvés.add(match.decode('utf-8', errors='ignore'))
-    
+        progress += 1
+        if progress_callback:
+            percent = int(progress * 100 / total)
+            progress_callback(percent)
     # Cherchons aussi les instances sans numéro
-    for vsti in vsti_connus:
+    for idx, vsti in enumerate(vsti_connus):
         # On évite les faux positifs en vérifiant que ce n'est pas au milieu d'un mot
         pattern = re.compile(rb'(?<!\w)' + vsti.encode('utf-8') + rb'(?!\w)')
         matches = pattern.findall(data)
         if matches:
             if not any(vsti in déjà_trouvé for déjà_trouvé in trouvés):
                 trouvés.add(vsti)
-    
+        progress += 1
+        if progress_callback:
+            percent = int(progress * 100 / total)
+            progress_callback(percent)
     # Cherchons aussi les entrées de type "Plugin Nam..."
     plugin_pattern = re.compile(rb'Plugin\s+Nam[^\n\r]{2,40}')
     plugin_matches = plugin_pattern.findall(data)
